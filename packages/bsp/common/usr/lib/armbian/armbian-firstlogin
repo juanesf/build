@@ -403,7 +403,6 @@ set_timezone_and_locales() {
 							rm -f /etc/netplan/30-wifis-dhcp.yaml
 							netplan apply --timeout 0 2>/dev/null
 							systemctl daemon-reload
-							break
 						fi
 
 				fi # detected or not detected wireless network
@@ -668,19 +667,6 @@ if [[ -f /root/.not_logged_in_yet && -n $(tty) ]]; then
 	# on network-online.target working correctly otherwise they will likely fail on boot
 	# Same goes for systemd-networkd stack
 	# https://github.com/armbian/build/issues/7896
-	if
-		systemctl is-enabled --quiet NetworkManager &&
-		systemctl is-enabled --quiet systemd-networkd
-	then
-		echo "Both NetworkManager and systemd-networkd services are enabled."
-		echo "This is known to cause problems with network startup."
-		echo "systemd-networkd will be disabled..."
-		sleep 30 # Give the user time to see the message
-		systemctl stop systemd-networkd
-		systemctl disable systemd-networkd
-		echo "systemd-networkd has been disabled."
-	fi
-
 	if
 		systemctl is-enabled --quiet NetworkManager &&
 		! systemctl is-enabled --quiet NetworkManager-wait-online
