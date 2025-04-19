@@ -1,6 +1,295 @@
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic8800d80_compat.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic8800d80_compat.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic8800d80_compat.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic8800d80_compat.c	2024-06-14 03:58:38.000000000 +0200
+from warpme's https://github.com/warpme/minimyth2/tree/master/script/kernel/
+diff --git a/drivers/net/wireless/Kconfig b/drivers/net/wireless/Kconfig
+index 73e9f3913..98b695f24 100644
+--- a/drivers/net/wireless/Kconfig
++++ b/drivers/net/wireless/Kconfig
+@@ -37,6 +37,7 @@ source "drivers/net/wireless/uwe5622/Kconfig"
+ source "drivers/net/wireless/ti/Kconfig"
+ source "drivers/net/wireless/zydas/Kconfig"
+ source "drivers/net/wireless/quantenna/Kconfig"
++source "drivers/net/wireless/aic8800_sdio/Kconfig"
+ 
+ source "drivers/net/wireless/virtual/Kconfig"
+ 
+diff --git a/drivers/net/wireless/Makefile b/drivers/net/wireless/Makefile
+index 0959a2b12..20a8dfb6b 100644
+--- a/drivers/net/wireless/Makefile
++++ b/drivers/net/wireless/Makefile
+@@ -22,5 +22,6 @@ obj-$(CONFIG_WLAN_VENDOR_SILABS) += silabs/
+ obj-$(CONFIG_WLAN_VENDOR_ST) += st/
+ obj-$(CONFIG_WLAN_VENDOR_TI) += ti/
+ obj-$(CONFIG_WLAN_VENDOR_ZYDAS) += zydas/
++obj-$(CONFIG_AIC_SDIO_WLAN_SUPPORT) += aic8800_sdio/
+ 
+ obj-$(CONFIG_WLAN) += virtual/
+diff --git a/drivers/net/wireless/aic8800_sdio/Kconfig b/drivers/net/wireless/aic8800_sdio/Kconfig
+new file mode 100644
+index 000000000..66c20f6d8
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/Kconfig
+@@ -0,0 +1,18 @@
++config AIC_WLAN_SUPPORT
++	bool "AIC wireless Support"
++	default n
++	help
++	  This is support for aic wireless chip.
++
++config AIC_FW_PATH
++	depends on AIC_WLAN_SUPPORT
++	string "Firmware & config file path"
++	default "/vendor/etc/firmware"
++	#default "/lib/firmware/aic8800_sdio"
++	help
++	  Path to the firmware & config file.
++
++if AIC_WLAN_SUPPORT
++source "drivers/net/wireless/aic8800/aic8800_fdrv/Kconfig"
++source "drivers/net/wireless/aic8800/aic8800_btlpm/Kconfig"
++endif
+diff --git a/drivers/net/wireless/aic8800_sdio/Makefile b/drivers/net/wireless/aic8800_sdio/Makefile
+new file mode 100644
+index 000000000..cac155948
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/Makefile
+@@ -0,0 +1,91 @@
++CONFIG_AIC8800_BTLPM_SUPPORT := m
++CONFIG_AIC8800_WLAN_SUPPORT := m
++CONFIG_AIC_WLAN_SUPPORT := m
++
++obj-$(CONFIG_AIC8800_BTLPM_SUPPORT) += aic8800_btlpm/
++obj-$(CONFIG_AIC8800_WLAN_SUPPORT) += aic8800_fdrv/
++obj-$(CONFIG_AIC_WLAN_SUPPORT) += aic8800_bsp/
++
++MAKEFLAGS +=-j$(shell nproc)
++
++########## config option ##########
++export CONFIG_USE_FW_REQUEST = n
++export CONFIG_PREALLOC_RX_SKB = n
++export CONFIG_PREALLOC_TXQ = y
++export CONFIG_OOB = n
++export CONFIG_GPIO_WAKEUP = n
++export CONFIG_RESV_MEM_SUPPORT = y
++###################################
++
++########## Platform support list ##########
++export CONFIG_PLATFORM_ROCKCHIP = n
++export CONFIG_PLATFORM_ROCKCHIP2 = n
++export CONFIG_PLATFORM_ALLWINNER = n
++export CONFIG_PLATFORM_AMLOGIC = n
++export CONFIG_PLATFORM_UBUNTU = y
++
++ifeq ($(CONFIG_PLATFORM_ROCKCHIP), y)
++ARCH = arm64
++KDIR = /home/yaya/E/Rockchip/3566/firefly/Android11.0/Firefly-RK356X_Android11.0_git_20210824/RK356X_Android11.0/kernel
++CROSS_COMPILE = /home/yaya/E/Rockchip/3566/firefly/Android11.0/Firefly-RK356X_Android11.0_git_20210824/RK356X_Android11.0/prebuilts/gcc/linux-x86/aarch64/gcc-linaro-6.3.1-2017.05-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-
++ccflags-y += -DANDROID_PLATFORM
++ccflags-y += -DCONFIG_PLATFORM_ROCKCHIP
++endif
++
++ifeq ($(CONFIG_PLATFORM_ROCKCHIP2), y)
++KDIR := /home/yaya/E/Rockchip/3126/Android6/kernel
++ARCH ?= arm
++CROSS_COMPILE ?= /home/yaya/E/Rockchip/3288/Android5/rk3288_JHY/prebuilts/gcc/linux-x86/arm/arm-eabi-4.6/bin/arm-eabi-
++ccflags-y += -DANDROID_PLATFORM
++ccflags-y += -DCONFIG_PLATFORM_ROCKCHIP2
++endif
++
++ifeq ($(CONFIG_PLATFORM_ALLWINNER), y)
++KDIR  = /home/yaya/E/Allwinner/A133/Android10/linux-4.9
++ARCH = arm64
++CROSS_COMPILE = /home/yaya/E/Allwinner/r818/Android10/lichee/out/gcc-linaro-5.3.1-2016.05-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-
++export CONFIG_SUPPORT_LPM = y
++ccflags-y += -DANDROID_PLATFORM
++endif
++
++ifeq ($(CONFIG_PLATFORM_AMLOGIC), y)
++ARCH = arm
++CROSS_COMPILE = /home/yaya/D/Workspace/CyberQuantum/JinHaoYue/amls905x3/SDK/20191101-0tt-asop/android9.0/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9/bin/arm-linux-androidkernel-
++KDIR = /home/yaya/D/Workspace/CyberQuantum/JinHaoYue/amls905x3/SDK/20191101-0tt-asop/android9.0/out/target/product/u202/obj/KERNEL_OBJ/
++ccflags-y += -DANDROID_PLATFORM
++export CONFIG_SUPPORT_LPM = y
++endif
++
++ifeq ($(CONFIG_PLATFORM_UBUNTU), y)
++KDIR  = /lib/modules/$(shell uname -r)/build
++PWD   = $(shell pwd)
++KVER = $(shell uname -r)
++MODDESTDIR = /lib/modules/$(KVER)/kernel/drivers/net/wireless/aic8800
++ARCH = x86_64
++CROSS_COMPILE ?=
++endif
++###########################################
++
++all: modules
++modules:
++	make -C $(KDIR) M=$(PWD) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) modules
++
++install:
++	mkdir -p $(MODDESTDIR)
++	install -p -m 644 aic8800_bsp/aic8800_bsp.ko  $(MODDESTDIR)/
++	install -p -m 644 aic8800_fdrv/aic8800_fdrv.ko  $(MODDESTDIR)/
++	install -p -m 644 aic8800_btlpm/aic8800_btlpm.ko  $(MODDESTDIR)/
++	/sbin/depmod -a ${KVER}
++
++uninstall:
++	rm -rfv $(MODDESTDIR)/aic8800_bsp.ko
++	rm -rfv $(MODDESTDIR)/aic8800_fdrv.ko
++	rm -rfv $(MODDESTDIR)/aic8800_btlpm.ko
++	/sbin/depmod -a ${KVER}
++
++clean:
++	cd aic8800_bsp/;make clean;cd ..
++	cd aic8800_fdrv/;make clean;cd ..
++	cd aic8800_btlpm/;make clean;cd ..
++	rm -rf modules.order Module.symvers .modules.order.cmd .Module.symvers.cmd .tmp_versions/
++
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_bsp/Makefile b/drivers/net/wireless/aic8800_sdio/aic8800_bsp/Makefile
+new file mode 100644
+index 000000000..bcccfbdbb
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_bsp/Makefile
+@@ -0,0 +1,136 @@
++CONFIG_SDIO_SUPPORT := y
++CONFIG_SDIO_PWRCTRL := y
++CONFIG_AIC_FW_PATH = "/vendor/etc/firmware"
++#CONFIG_AIC_FW_PATH = "/lib/firmware/aic8800"
++export CONFIG_AIC_FW_PATH
++ccflags-y += -DCONFIG_AIC_FW_PATH=\"$(CONFIG_AIC_FW_PATH)\"
++
++MODULE_NAME := aic8800_bsp
++ifeq ($(CONFIG_SDIO_SUPPORT), y)
++ccflags-y += -DAICWF_SDIO_SUPPORT
++ccflags-$(CONFIG_SDIO_PWRCTRL) += -DCONFIG_SDIO_PWRCTRL
++endif
++
++CONFIG_GPIO_WAKEUP ?= n
++CONFIG_M2D_OTA_AUTO_SUPPORT = n
++CONFIG_M2D_OTA_LZMA_SUPPORT = n
++CONFIG_LINK_DET_5G = y
++CONFIG_MCU_MESSAGE = n
++CONFIG_FIRMWARE_ARRAY = n
++# Need to set fw path in BOARD_KERNEL_CMDLINE
++CONFIG_USE_FW_REQUEST ?= n
++CONFIG_FDRV_NO_REG_SDIO = n
++CONFIG_VRF_DCDC_MODE = y
++CONFIG_OOB ?= n
++CONFIG_PREALLOC_TXQ = y
++CONFIG_DPD = y
++CONFIG_FORCE_DPD_CALIB = y
++CONFIG_RESV_MEM_SUPPORT ?= y
++CONFIG_AMSDU_RX = n
++CONFIG_IRQ_FALL ?= n
++CONFIG_SDIO_BT = n
++
++ccflags-$(CONFIG_GPIO_WAKEUP) += -DCONFIG_GPIO_WAKEUP
++ccflags-$(CONFIG_M2D_OTA_AUTO_SUPPORT) += -DCONFIG_M2D_OTA_AUTO_SUPPORT
++ccflags-$(CONFIG_M2D_OTA_LZMA_SUPPORT) += -DCONFIG_M2D_OTA_LZMA_SUPPORT
++ccflags-$(CONFIG_LINK_DET_5G) += -DCONFIG_LINK_DET_5G
++ccflags-$(CONFIG_MCU_MESSAGE) += -DCONFIG_MCU_MESSAGE
++ccflags-$(CONFIG_FIRMWARE_ARRAY) += -DCONFIG_FIRMWARE_ARRAY
++ccflags-$(CONFIG_USE_FW_REQUEST) += -DCONFIG_USE_FW_REQUEST
++ccflags-$(CONFIG_FDRV_NO_REG_SDIO) += -DCONFIG_FDRV_NO_REG_SDIO
++ccflags-$(CONFIG_VRF_DCDC_MODE) += -DCONFIG_VRF_DCDC_MODE
++ccflags-$(CONFIG_OOB) += -DCONFIG_OOB
++ccflags-$(CONFIG_PREALLOC_TXQ) += -DCONFIG_PREALLOC_TXQ
++ccflags-$(CONFIG_DPD)  += -DCONFIG_DPD
++ccflags-$(CONFIG_FORCE_DPD_CALIB) += -DCONFIG_FORCE_DPD_CALIB -DCONFIG_DPD
++ccflags-$(CONFIG_RESV_MEM_SUPPORT) += -DCONFIG_RESV_MEM_SUPPORT
++ccflags-$(CONFIG_AMSDU_RX) += -DCONFIG_AMSDU_RX
++ccflags-$(CONFIG_IRQ_FALL) += -DCONFIG_IRQ_FALL
++ccflags-$(CONFIG_SDIO_BT) += -DCONFIG_SDIO_BT
++
++obj-m := $(MODULE_NAME).o
++$(MODULE_NAME)-y := \
++	aic8800dc_compat.o \
++	aic8800d80_compat.o \
++	aic_bsp_main.o \
++	aic_bsp_driver.o \
++	aicsdio.o \
++	aicsdio_txrxif.o \
++	md5.o
++
++$(MODULE_NAME)-$(CONFIG_PREALLOC_TXQ)     += aicwf_txq_prealloc.o
++
++ifeq ($(CONFIG_FIRMWARE_ARRAY),y)
++$(MODULE_NAME)-y +=	aicwf_firmware_array.o
++endif
++
++########## Platform support list ##########
++CONFIG_PLATFORM_ROCKCHIP ?= n
++CONFIG_PLATFORM_ROCKCHIP2 ?= n
++CONFIG_PLATFORM_ALLWINNER ?=n
++CONFIG_PLATFORM_INGENIC_T20 ?= n
++CONFIG_PLATFORM_AMLOGIC ?= n
++CONFIG_PLATFORM_UBUNTU ?= y
++
++ifeq ($(CONFIG_PLATFORM_ROCKCHIP), y)
++ccflags-$(CONFIG_PLATFORM_ROCKCHIP) += -DCONFIG_PLATFORM_ROCKCHIP
++KDIR ?= /home/yaya/E/Rockchip/3566/firefly/Android11.0/Firefly-RK356X_Android11.0_git_20210824/RK356X_Android11.0/kernel
++ARCH ?= arm64
++CROSS_COMPILE ?= /home/yaya/E/Rockchip/3566/Android11/rk3566_rk3568_android11_oranth/prebuilts/gcc/linux-x86/aarch64/gcc-linaro-6.3.1-2017.05-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-
++endif
++
++ifeq ($(CONFIG_PLATFORM_ROCKCHIP2), y)
++ccflags-$(CONFIG_PLATFORM_ROCKCHIP2) += -DCONFIG_PLATFORM_ROCKCHIP2
++ARCH ?= arm64
++KDIR ?= /home/yaya/E/Rockchip/3566/firefly/Android11.0/Firefly-RK356X_Android11.0_git_20210824/RK356X_Android11.0/kernel
++CROSS_COMPILE ?= /home/yaya/E/Rockchip/3566/firefly/Android11.0/Firefly-RK356X_Android11.0_git_20210824/RK356X_Android11.0/prebuilts/gcc/linux-x86/aarch64/gcc-linaro-6.3.1-2017.05-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-
++endif
++
++ifeq ($(CONFIG_PLATFORM_ALLWINNER), y)
++ccflags-$(CONFIG_PLATFORM_ALLWINNER) += -DCONFIG_PLATFORM_ALLWINNER
++KDIR  ?= /home/yaya/E/Allwinner/r818/Android10/lichee/kernel/linux-4.9/
++ARCH ?= arm64
++CROSS_COMPILE ?= /home/yaya/E/Allwinner/r818/Android10/android/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/bin/aarch64-linux-android-
++
++endif
++
++ifeq ($(CONFIG_PLATFORM_INGENIC_T20), y)
++KDIR ?= /home/yaya/E/T40/kernel
++ARCH ?= mips
++CROSS_COMPILE ?= /home/yaya/E/T40/mips-linux-gnu-ingenic-gcc7.2.0-glibc2.29-fp64/bin/mips-linux-gnu-
++endif
++
++ifeq ($(CONFIG_PLATFORM_AMLOGIC), y)
++ccflags-$(CONFIG_PLATFORM_AMLOGIC) += -DCONFIG_PLATFORM_AMLOGIC
++KDIR  ?= /home/aiden/D1/SDK/Amlogic/905x3_a9/android9.0/out/target/product/u202/obj/KERNEL_OBJ/
++ARCH ?= arm
++CROSS_COMPILE ?= /home/aiden/D1/SDK/Amlogic/905x3_a9/android9.0/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9/bin/arm-linux-androideabi-
++endif
++
++ifeq ($(CONFIG_PLATFORM_UBUNTU), y)
++ccflags-$(CONFIG_PLATFORM_UBUNTU) += -DCONFIG_PLATFORM_UBUNTU
++KDIR  ?= /lib/modules/$(shell uname -r)/build
++PWD   ?= $(shell pwd)
++KVER ?= $(shell uname -r)
++MODDESTDIR ?= /lib/modules/$(KVER)/kernel/drivers/net/wireless/
++ARCH ?= x86_64
++CROSS_COMPILE ?=
++endif
++###########################################
++
++all: modules
++modules:
++	make -C $(KDIR) M=$(PWD) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) modules
++
++install:
++	mkdir -p $(MODDESTDIR)
++	install -p -m 644 $(MODULE_NAME).ko  $(MODDESTDIR)
++	/sbin/depmod -a ${KVER}
++
++uninstall:
++	rm -rfv $(MODDESTDIR)/$(MODULE_NAME).ko
++	/sbin/depmod -a ${KVER}
++
++clean:
++	rm -rf *.o *.ko *.o.* *.mod.* modules.* Module.* .a* .o* .*.o.* *.mod .tmp* .cache.mk built-in.a
++
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic8800d80_compat.c b/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic8800d80_compat.c
+new file mode 100644
+index 000000000..ae94ac146
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic8800d80_compat.c
 @@ -0,0 +1,252 @@
 +#include "aic8800d80_compat.h"
 +#include "aic_bsp_driver.h"
@@ -254,9 +543,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +}
 +
 +
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic8800d80_compat.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic8800d80_compat.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic8800d80_compat.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic8800d80_compat.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic8800d80_compat.h b/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic8800d80_compat.h
+new file mode 100644
+index 000000000..209565826
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic8800d80_compat.h
 @@ -0,0 +1,24 @@
 +#ifndef _AIC8800D80_COMPAT_H_
 +#define _AIC8800D80_COMPAT_H_
@@ -282,9 +573,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +
 +
 +
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic8800dc_compat.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic8800dc_compat.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic8800dc_compat.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic8800dc_compat.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic8800dc_compat.c b/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic8800dc_compat.c
+new file mode 100644
+index 000000000..796a32168
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic8800dc_compat.c
 @@ -0,0 +1,2275 @@
 +#include <linux/version.h>
 +#include "aic8800dc_compat.h"
@@ -2561,9 +2854,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +#endif
 +
 +
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic8800dc_compat.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic8800dc_compat.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic8800dc_compat.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic8800dc_compat.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic8800dc_compat.h b/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic8800dc_compat.h
+new file mode 100644
+index 000000000..67074cecf
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic8800dc_compat.h
 @@ -0,0 +1,37 @@
 +#ifndef _AIC8800DC_COMPAT_H_
 +#define _AIC8800DC_COMPAT_H_
@@ -2602,9 +2897,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +
 +
 +
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic_bsp_driver.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic_bsp_driver.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic_bsp_driver.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic_bsp_driver.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic_bsp_driver.c b/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic_bsp_driver.c
+new file mode 100644
+index 000000000..40dd98b03
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic_bsp_driver.c
 @@ -0,0 +1,2051 @@
 +/**
 + ******************************************************************************
@@ -3075,8 +3372,8 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +							msg_hdlrs[MSG_T(msg->id)][MSG_I(msg->id)]);
 +}
 +
-+#if MODULE_IMPORT_NS
-+MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
++MODULE_IMPORT_NS("VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver");
 +#endif
 +
 +#define MD5(x) x[0],x[1],x[2],x[3],x[4],x[5],x[6],x[7],x[8],x[9],x[10],x[11],x[12],x[13],x[14],x[15]
@@ -4657,9 +4954,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +}
 +
 +#endif
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic_bsp_driver.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic_bsp_driver.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic_bsp_driver.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic_bsp_driver.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic_bsp_driver.h b/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic_bsp_driver.h
+new file mode 100644
+index 000000000..9b42fdbad
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic_bsp_driver.h
 @@ -0,0 +1,581 @@
 +/**
 + ******************************************************************************
@@ -5242,9 +5541,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +extern const struct aicbsp_firmware fw_8800d80_u02[];
 +
 +#endif
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic_bsp_export.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic_bsp_export.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic_bsp_export.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic_bsp_export.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic_bsp_export.h b/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic_bsp_export.h
+new file mode 100644
+index 000000000..249d6ec08
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic_bsp_export.h
 @@ -0,0 +1,65 @@
 +#ifndef __AIC_BSP_EXPORT_H
 +#define __AIC_BSP_EXPORT_H
@@ -5311,9 +5612,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +void aicbsp_resv_mem_kfree_skb(struct sk_buff *skb, uint32_t id);
 +
 +#endif
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic_bsp_main.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic_bsp_main.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic_bsp_main.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic_bsp_main.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic_bsp_main.c b/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic_bsp_main.c
+new file mode 100644
+index 000000000..7666a1f09
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aic_bsp_main.c
 @@ -0,0 +1,393 @@
 +#include <linux/module.h>
 +#include <linux/inetdevice.h>
@@ -5708,9 +6011,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +MODULE_VERSION(DRV_VERS_MOD);
 +MODULE_AUTHOR(DRV_COPYRIGHT " " DRV_AUTHOR);
 +MODULE_LICENSE("GPL");
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicsdio.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicsdio.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicsdio.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicsdio.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicsdio.c b/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicsdio.c
+new file mode 100644
+index 000000000..4a9707c03
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicsdio.c
 @@ -0,0 +1,1980 @@
 +/**
 + * aicwf_sdmmc.c
@@ -7286,7 +7591,7 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +	spin_lock_bh(&sdiodev->pwrctl_lock);
 +	if (!duration) {
 +		if (timer_pending(&sdiodev->timer))
-+			del_timer_sync(&sdiodev->timer);
++			timer_delete_sync(&sdiodev->timer);
 +	} else {
 +		sdiodev->active_duration = duration;
 +		timeout = msecs_to_jiffies(sdiodev->active_duration);
@@ -7692,9 +7997,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +EXPORT_SYMBOL(get_sdio_func);
 +EXPORT_SYMBOL(set_irq_handler);
 +
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicsdio.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicsdio.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicsdio.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicsdio.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicsdio.h b/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicsdio.h
+new file mode 100644
+index 000000000..68efaf5f6
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicsdio.h
 @@ -0,0 +1,148 @@
 +/**
 + * aicwf_sdio.h
@@ -7844,9 +8151,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +#endif /* AICWF_SDIO_SUPPORT */
 +
 +#endif /*_AICWF_SDMMC_H_*/
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicsdio_txrxif.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicsdio_txrxif.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicsdio_txrxif.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicsdio_txrxif.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicsdio_txrxif.c b/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicsdio_txrxif.c
+new file mode 100644
+index 000000000..82bacf945
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicsdio_txrxif.c
 @@ -0,0 +1,465 @@
 +/**
 + * aicwf_bus.c
@@ -8313,9 +8622,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +}
 +
 +
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicsdio_txrxif.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicsdio_txrxif.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicsdio_txrxif.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicsdio_txrxif.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicsdio_txrxif.h b/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicsdio_txrxif.h
+new file mode 100644
+index 000000000..801e0ea49
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicsdio_txrxif.h
 @@ -0,0 +1,214 @@
 +/**
 + * aicwf_txrxif.h
@@ -8531,9 +8842,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +struct sk_buff *aicwf_frame_queue_peek_tail(struct frame_queue *pq, int *prio_out);
 +
 +#endif /* _AICWF_TXRXIF_H_ */
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicwf_firmware_array.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicwf_firmware_array.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicwf_firmware_array.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicwf_firmware_array.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicwf_firmware_array.c b/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicwf_firmware_array.c
+new file mode 100644
+index 000000000..77130f76b
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicwf_firmware_array.c
 @@ -0,0 +1,16138 @@
 +#include <linux/module.h>
 +
@@ -24674,16 +24987,20 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +	return 0;
 +}
 \ No newline at end of file
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicwf_firmware_array.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicwf_firmware_array.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicwf_firmware_array.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicwf_firmware_array.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicwf_firmware_array.h b/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicwf_firmware_array.h
+new file mode 100644
+index 000000000..dcf38e9ba
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicwf_firmware_array.h
 @@ -0,0 +1,3 @@
 +int aicwf_get_firmware_array(char* fw_name, u32 **fw_buf);
 +
 +
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicwf_txq_prealloc.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicwf_txq_prealloc.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicwf_txq_prealloc.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicwf_txq_prealloc.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicwf_txq_prealloc.c b/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicwf_txq_prealloc.c
+new file mode 100644
+index 000000000..9514c416b
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicwf_txq_prealloc.c
 @@ -0,0 +1,62 @@
 +#include <linux/slab.h>
 +#include "aicsdio_txrxif.h"
@@ -24747,171 +25064,21 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +
 +EXPORT_SYMBOL(aicwf_prealloc_txq_alloc);
 +
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicwf_txq_prealloc.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicwf_txq_prealloc.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicwf_txq_prealloc.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicwf_txq_prealloc.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicwf_txq_prealloc.h b/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicwf_txq_prealloc.h
+new file mode 100644
+index 000000000..ce4ee0747
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_bsp/aicwf_txq_prealloc.h
 @@ -0,0 +1,4 @@
 +
 +
 +void aicwf_prealloc_txq_free(void);
 +
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/.gitignore linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/.gitignore
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/.gitignore	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/.gitignore	2024-06-14 03:58:38.000000000 +0200
-@@ -0,0 +1,10 @@
-+*.o
-+*.ko
-+*.order
-+*.symvers
-+*.o.d
-+*.o.cmd
-+*.ko.cmd
-+*.mod
-+*.mod.c
-+*.mod.cmd
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/Makefile linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/Makefile
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/Makefile	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/Makefile	2024-06-14 03:58:38.000000000 +0200
-@@ -0,0 +1,136 @@
-+CONFIG_SDIO_SUPPORT := y
-+CONFIG_SDIO_PWRCTRL := y
-+CONFIG_AIC_FW_PATH = "/vendor/etc/firmware"
-+#CONFIG_AIC_FW_PATH = "/lib/firmware/aic8800"
-+export CONFIG_AIC_FW_PATH
-+ccflags-y += -DCONFIG_AIC_FW_PATH=\"$(CONFIG_AIC_FW_PATH)\"
-+
-+MODULE_NAME := aic8800_bsp
-+ifeq ($(CONFIG_SDIO_SUPPORT), y)
-+ccflags-y += -DAICWF_SDIO_SUPPORT
-+ccflags-$(CONFIG_SDIO_PWRCTRL) += -DCONFIG_SDIO_PWRCTRL
-+endif
-+
-+CONFIG_GPIO_WAKEUP ?= n
-+CONFIG_M2D_OTA_AUTO_SUPPORT = n
-+CONFIG_M2D_OTA_LZMA_SUPPORT = n
-+CONFIG_LINK_DET_5G = y
-+CONFIG_MCU_MESSAGE = n
-+CONFIG_FIRMWARE_ARRAY = n
-+# Need to set fw path in BOARD_KERNEL_CMDLINE
-+CONFIG_USE_FW_REQUEST ?= n
-+CONFIG_FDRV_NO_REG_SDIO = n
-+CONFIG_VRF_DCDC_MODE = y
-+CONFIG_OOB ?= n
-+CONFIG_PREALLOC_TXQ = y
-+CONFIG_DPD = y
-+CONFIG_FORCE_DPD_CALIB = y
-+CONFIG_RESV_MEM_SUPPORT ?= y
-+CONFIG_AMSDU_RX = n
-+CONFIG_IRQ_FALL ?= n
-+CONFIG_SDIO_BT = n
-+
-+ccflags-$(CONFIG_GPIO_WAKEUP) += -DCONFIG_GPIO_WAKEUP
-+ccflags-$(CONFIG_M2D_OTA_AUTO_SUPPORT) += -DCONFIG_M2D_OTA_AUTO_SUPPORT
-+ccflags-$(CONFIG_M2D_OTA_LZMA_SUPPORT) += -DCONFIG_M2D_OTA_LZMA_SUPPORT
-+ccflags-$(CONFIG_LINK_DET_5G) += -DCONFIG_LINK_DET_5G
-+ccflags-$(CONFIG_MCU_MESSAGE) += -DCONFIG_MCU_MESSAGE
-+ccflags-$(CONFIG_FIRMWARE_ARRAY) += -DCONFIG_FIRMWARE_ARRAY
-+ccflags-$(CONFIG_USE_FW_REQUEST) += -DCONFIG_USE_FW_REQUEST
-+ccflags-$(CONFIG_FDRV_NO_REG_SDIO) += -DCONFIG_FDRV_NO_REG_SDIO
-+ccflags-$(CONFIG_VRF_DCDC_MODE) += -DCONFIG_VRF_DCDC_MODE
-+ccflags-$(CONFIG_OOB) += -DCONFIG_OOB
-+ccflags-$(CONFIG_PREALLOC_TXQ) += -DCONFIG_PREALLOC_TXQ
-+ccflags-$(CONFIG_DPD)  += -DCONFIG_DPD
-+ccflags-$(CONFIG_FORCE_DPD_CALIB) += -DCONFIG_FORCE_DPD_CALIB -DCONFIG_DPD
-+ccflags-$(CONFIG_RESV_MEM_SUPPORT) += -DCONFIG_RESV_MEM_SUPPORT
-+ccflags-$(CONFIG_AMSDU_RX) += -DCONFIG_AMSDU_RX
-+ccflags-$(CONFIG_IRQ_FALL) += -DCONFIG_IRQ_FALL
-+ccflags-$(CONFIG_SDIO_BT) += -DCONFIG_SDIO_BT
-+
-+obj-m := $(MODULE_NAME).o
-+$(MODULE_NAME)-y := \
-+	aic8800dc_compat.o \
-+	aic8800d80_compat.o \
-+	aic_bsp_main.o \
-+	aic_bsp_driver.o \
-+	aicsdio.o \
-+	aicsdio_txrxif.o \
-+	md5.o
-+
-+$(MODULE_NAME)-$(CONFIG_PREALLOC_TXQ)     += aicwf_txq_prealloc.o
-+
-+ifeq ($(CONFIG_FIRMWARE_ARRAY),y)
-+$(MODULE_NAME)-y +=	aicwf_firmware_array.o
-+endif
-+
-+########## Platform support list ##########
-+CONFIG_PLATFORM_ROCKCHIP ?= n
-+CONFIG_PLATFORM_ROCKCHIP2 ?= n
-+CONFIG_PLATFORM_ALLWINNER ?=n
-+CONFIG_PLATFORM_INGENIC_T20 ?= n
-+CONFIG_PLATFORM_AMLOGIC ?= n
-+CONFIG_PLATFORM_UBUNTU ?= y
-+
-+ifeq ($(CONFIG_PLATFORM_ROCKCHIP), y)
-+ccflags-$(CONFIG_PLATFORM_ROCKCHIP) += -DCONFIG_PLATFORM_ROCKCHIP
-+KDIR ?= /home/yaya/E/Rockchip/3566/firefly/Android11.0/Firefly-RK356X_Android11.0_git_20210824/RK356X_Android11.0/kernel
-+ARCH ?= arm64
-+CROSS_COMPILE ?= /home/yaya/E/Rockchip/3566/Android11/rk3566_rk3568_android11_oranth/prebuilts/gcc/linux-x86/aarch64/gcc-linaro-6.3.1-2017.05-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-
-+endif
-+
-+ifeq ($(CONFIG_PLATFORM_ROCKCHIP2), y)
-+ccflags-$(CONFIG_PLATFORM_ROCKCHIP2) += -DCONFIG_PLATFORM_ROCKCHIP2
-+ARCH ?= arm64
-+KDIR ?= /home/yaya/E/Rockchip/3566/firefly/Android11.0/Firefly-RK356X_Android11.0_git_20210824/RK356X_Android11.0/kernel
-+CROSS_COMPILE ?= /home/yaya/E/Rockchip/3566/firefly/Android11.0/Firefly-RK356X_Android11.0_git_20210824/RK356X_Android11.0/prebuilts/gcc/linux-x86/aarch64/gcc-linaro-6.3.1-2017.05-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-
-+endif
-+
-+ifeq ($(CONFIG_PLATFORM_ALLWINNER), y)
-+ccflags-$(CONFIG_PLATFORM_ALLWINNER) += -DCONFIG_PLATFORM_ALLWINNER
-+KDIR  ?= /home/yaya/E/Allwinner/r818/Android10/lichee/kernel/linux-4.9/
-+ARCH ?= arm64
-+CROSS_COMPILE ?= /home/yaya/E/Allwinner/r818/Android10/android/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/bin/aarch64-linux-android-
-+
-+endif
-+
-+ifeq ($(CONFIG_PLATFORM_INGENIC_T20), y)
-+KDIR ?= /home/yaya/E/T40/kernel
-+ARCH ?= mips
-+CROSS_COMPILE ?= /home/yaya/E/T40/mips-linux-gnu-ingenic-gcc7.2.0-glibc2.29-fp64/bin/mips-linux-gnu-
-+endif
-+
-+ifeq ($(CONFIG_PLATFORM_AMLOGIC), y)
-+ccflags-$(CONFIG_PLATFORM_AMLOGIC) += -DCONFIG_PLATFORM_AMLOGIC
-+KDIR  ?= /home/aiden/D1/SDK/Amlogic/905x3_a9/android9.0/out/target/product/u202/obj/KERNEL_OBJ/
-+ARCH ?= arm
-+CROSS_COMPILE ?= /home/aiden/D1/SDK/Amlogic/905x3_a9/android9.0/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9/bin/arm-linux-androideabi-
-+endif
-+
-+ifeq ($(CONFIG_PLATFORM_UBUNTU), y)
-+ccflags-$(CONFIG_PLATFORM_UBUNTU) += -DCONFIG_PLATFORM_UBUNTU
-+KDIR  ?= /lib/modules/$(shell uname -r)/build
-+PWD   ?= $(shell pwd)
-+KVER ?= $(shell uname -r)
-+MODDESTDIR ?= /lib/modules/$(KVER)/kernel/drivers/net/wireless/
-+ARCH ?= x86_64
-+CROSS_COMPILE ?=
-+endif
-+###########################################
-+
-+all: modules
-+modules:
-+	make -C $(KDIR) M=$(PWD) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) modules
-+
-+install:
-+	mkdir -p $(MODDESTDIR)
-+	install -p -m 644 $(MODULE_NAME).ko  $(MODDESTDIR)
-+	/sbin/depmod -a ${KVER}
-+
-+uninstall:
-+	rm -rfv $(MODDESTDIR)/$(MODULE_NAME).ko
-+	/sbin/depmod -a ${KVER}
-+
-+clean:
-+	rm -rf *.o *.ko *.o.* *.mod.* modules.* Module.* .a* .o* .*.o.* *.mod .tmp* .cache.mk built-in.a
-+
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/md5.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/md5.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/md5.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/md5.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_bsp/md5.c b/drivers/net/wireless/aic8800_sdio/aic8800_bsp/md5.c
+new file mode 100644
+index 000000000..3d7b65375
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_bsp/md5.c
 @@ -0,0 +1,161 @@
 +#include <linux/memory.h>
 +#include "md5.h"
@@ -25074,9 +25241,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +     state[2] += c;
 +     state[3] += d;
 +}
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/md5.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/md5.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/md5.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/md5.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_bsp/md5.h b/drivers/net/wireless/aic8800_sdio/aic8800_bsp/md5.h
+new file mode 100644
+index 000000000..6ed5c0f8e
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_bsp/md5.h
 @@ -0,0 +1,48 @@
 +#ifndef MD5_H
 +#define MD5_H
@@ -25126,17 +25295,121 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +void MD5Decode(unsigned int *output,unsigned char *input,unsigned int len);
 + 
 +#endif
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/rwnx_version_gen.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/rwnx_version_gen.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/rwnx_version_gen.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_bsp/rwnx_version_gen.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_bsp/rwnx_version_gen.h b/drivers/net/wireless/aic8800_sdio/aic8800_bsp/rwnx_version_gen.h
+new file mode 100644
+index 000000000..ed5429ee9
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_bsp/rwnx_version_gen.h
 @@ -0,0 +1,4 @@
 +#define RWNX_VERS_REV "241c091M (master)"
 +#define RWNX_VERS_MOD "6.4.3.0"
 +#define RWNX_VERS_BANNER "rwnx v6.4.3.0 - - 241c091M (master)"
 +#define RELEASE_DATE "2024_0327_3561b08f"
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/aic8800_btlpm.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/aic8800_btlpm.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/aic8800_btlpm.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/aic8800_btlpm.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/Kconfig b/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/Kconfig
+new file mode 100644
+index 000000000..ff7aaa649
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/Kconfig
+@@ -0,0 +1,5 @@
++config AIC8800_BTLPM_SUPPORT
++	tristate "AIC8800 bluetooth Support"
++	help
++	  This is support for aic bluetooh driver.
++
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/Makefile b/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/Makefile
+new file mode 100644
+index 000000000..6d59301f9
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/Makefile
+@@ -0,0 +1,83 @@
++CONFIG_AIC8800_BTLPM_SUPPORT = m
++
++obj-$(CONFIG_AIC8800_BTLPM_SUPPORT) := aic8800_btlpm.o
++
++ccflags-y += -I$(srctree)/$(src)/../aic8800_bsp
++
++# Platform support list
++CONFIG_PLATFORM_ROCKCHIP ?= n
++CONFIG_PLATFORM_ROCKCHIP2 ?= n
++CONFIG_PLATFORM_ALLWINNER ?= n
++CONFIG_PLATFORM_AMLOGIC ?= n
++CONFIG_PLATFORM_UBUNTU ?= y
++
++
++CONFIG_SUPPORT_LPM ?= n
++CONFIG_AUTO_PM ?= n
++
++aic8800_btlpm-y := \
++	aic_bluetooth_main.o \
++	rfkill.o \
++
++aic8800_btlpm-$(CONFIG_SUPPORT_LPM) += lpm.o
++
++ccflags-y += -DAIC_TRACE_INCLUDE_PATH=$(src)
++
++ccflags-$(CONFIG_AUTO_PM) += -DCONFIG_AUTO_PM
++
++ifeq ($(CONFIG_PLATFORM_ROCKCHIP), y)
++ARCH = arm64
++KDIR = /home/yaya/E/Rockchip/3566/firefly/Android11.0/Firefly-RK356X_Android11.0_git_20210824/RK356X_Android11.0/kernel
++CROSS_COMPILE = /home/yaya/E/Rockchip/3566/firefly/Android11.0/Firefly-RK356X_Android11.0_git_20210824/RK356X_Android11.0/prebuilts/gcc/linux-x86/aarch64/gcc-linaro-6.3.1-2017.05-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-
++ccflags-$(CONFIG_PLATFORM_ROCKCHIP) += -DCONFIG_PLATFORM_ROCKCHIP
++ccflags-y += -DANDROID_PLATFORM
++endif
++
++ifeq ($(CONFIG_PLATFORM_ROCKCHIP2), y)
++ARCH = arm64
++KDIR = /home/yaya/E/Rockchip/3566/firefly/Android11.0/Firefly-RK356X_Android11.0_git_20210824/RK356X_Android11.0/kernel
++CROSS_COMPILE = /home/yaya/E/Rockchip/3566/firefly/Android11.0/Firefly-RK356X_Android11.0_git_20210824/RK356X_Android11.0/prebuilts/gcc/linux-x86/aarch64/gcc-linaro-6.3.1-2017.05-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-
++ccflags-$(CONFIG_PLATFORM_ROCKCHIP2) += -DCONFIG_PLATFORM_ROCKCHIP2
++ccflags-y += -DANDROID_PLATFORM
++endif
++
++ifeq ($(CONFIG_PLATFORM_ALLWINNER), y)
++ccflags-$(CONFIG_PLATFORM_ALLWINNER) += -DCONFIG_PLATFORM_ALLWINNER
++KDIR  ?= /home/yaya/E/Allwinner/R818/R818/AndroidQ/lichee/kernel/linux-4.9/
++ARCH ?= arm64
++CROSS_COMPILE ?= /home/yaya/E/Allwinner/R818/R818/AndroidQ/android/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/bin/aarch64-linux-android-
++ccflags-y += -DANDROID_PLATFORM
++endif
++
++ifeq ($(CONFIG_PLATFORM_AMLOGIC), y)
++ccflags-$(CONFIG_PLATFORM_NANOPI) += -DCONFIG_PLATFORM_NANOPI
++ccflags-y += -DANDROID_PLATFORM
++endif
++
++ifeq ($(CONFIG_PLATFORM_UBUNTU), y)
++KDIR  ?= /lib/modules/$(shell uname -r)/build
++PWD   ?= $(shell pwd)
++KVER ?= $(shell uname -r)
++MODDESTDIR ?= /lib/modules/$(KVER)/kernel/drivers/net/wireless/
++ARCH ?= x86_64
++CROSS_COMPILE ?=
++endif
++
++
++all: modules
++modules:
++	make -C $(KDIR) M=$(PWD) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) modules
++
++install:
++	mkdir -p $(MODDESTDIR)
++	install -p -m 644 $(MODULE_NAME).ko  $(MODDESTDIR)
++	/sbin/depmod -a ${KVER}
++
++uninstall:
++	rm -rfv $(MODDESTDIR)/$(MODULE_NAME).ko
++	/sbin/depmod -a ${KVER}
++
++clean:
++	rm -rf *.o *.ko *.o.* *.mod.* modules.* Module.* .a* .o* .*.o.* *.mod .tmp* .cache.mk
++
++
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/aic8800_btlpm.c b/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/aic8800_btlpm.c
+new file mode 100644
+index 000000000..52d768d83
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/aic8800_btlpm.c
 @@ -0,0 +1,1167 @@
 +/*
 + *
@@ -25719,7 +25992,7 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +
 +	return 0;
 +fail:
-+	del_timer(&rx_timer);
++	timer_delete(&rx_timer);
 +	atomic_inc(&open_count);
 +
 +	return retval;
@@ -25742,7 +26015,7 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +	/* assert BT_WAKE */
 +	gpio_set_value(bsi->ext_wake, bsi->ext_wake_assert);
 +
-+	del_timer(&rx_timer);
++	timer_delete(&rx_timer);
 +	clear_bit(BT_PROTO, &flags);
 +
 +	if (test_bit(BT_ASLEEP, &flags)) {
@@ -26089,7 +26362,7 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +		if (disable_irq_wake(bsi->host_wake_irq))
 +			BT_ERR("Couldn't disable hostwake IRQ wakeup mode\n");
 +		free_irq(bsi->host_wake_irq, &bsi->pdev->dev);
-+		del_timer(&rx_timer);
++		timer_delete(&rx_timer);
 +		if (test_bit(BT_ASLEEP, &flags))
 +			hsuart_power(1);
 +	}
@@ -26305,9 +26578,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +#ifdef MODULE_LICENSE
 +MODULE_LICENSE("GPL");
 +#endif
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/aic_bluetooth_main.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/aic_bluetooth_main.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/aic_bluetooth_main.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/aic_bluetooth_main.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/aic_bluetooth_main.c b/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/aic_bluetooth_main.c
+new file mode 100644
+index 000000000..122d867f0
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/aic_bluetooth_main.c
 @@ -0,0 +1,88 @@
 +#include <linux/module.h>
 +#include <linux/inetdevice.h>
@@ -26397,9 +26672,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +MODULE_VERSION(DRV_VERS_MOD);
 +MODULE_AUTHOR(DRV_COPYRIGHT " " DRV_AUTHOR);
 +MODULE_LICENSE("GPL");
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/aic_bsp_export.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/aic_bsp_export.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/aic_bsp_export.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/aic_bsp_export.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/aic_bsp_export.h b/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/aic_bsp_export.h
+new file mode 100644
+index 000000000..88f6b565c
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/aic_bsp_export.h
 @@ -0,0 +1,19 @@
 +#ifndef __AIC_BSP_EXPORT_H
 +#define __AIC_BSP_EXPORT_H
@@ -26420,32 +26697,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +int aicbsp_get_feature(struct aicbsp_feature_t *feature);
 +
 +#endif
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/.gitignore linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/.gitignore
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/.gitignore	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/.gitignore	2024-06-14 03:58:38.000000000 +0200
-@@ -0,0 +1,10 @@
-+*.o
-+*.ko
-+*.order
-+*.symvers
-+*.o.d
-+*.o.cmd
-+*.ko.cmd
-+*.mod
-+*.mod.c
-+*.mod.cmd
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/Kconfig linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/Kconfig
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/Kconfig	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/Kconfig	2024-06-14 03:58:38.000000000 +0200
-@@ -0,0 +1,5 @@
-+config AIC8800_BTLPM_SUPPORT
-+	tristate "AIC8800 bluetooth Support"
-+	help
-+	  This is support for aic bluetooh driver.
-+
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/lpm.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/lpm.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/lpm.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/lpm.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/lpm.c b/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/lpm.c
+new file mode 100644
+index 000000000..6e9b71564
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/lpm.c
 @@ -0,0 +1,1111 @@
 +/*
 + *
@@ -27007,7 +27263,7 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +
 +	return 0;
 +fail:
-+	del_timer(&rx_timer);
++	timer_delete(&rx_timer);
 +	atomic_inc(&open_count);
 +
 +	return retval;
@@ -27030,7 +27286,7 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +	/* assert BT_WAKE */
 +	gpio_set_value(bsi->ext_wake, bsi->ext_wake_assert);
 +
-+	del_timer(&rx_timer);
++	timer_delete(&rx_timer);
 +	clear_bit(BT_PROTO, &flags);
 +
 +	if (test_bit(BT_ASLEEP, &flags)) {
@@ -27382,7 +27638,7 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +		if (disable_irq_wake(bsi->host_wake_irq))
 +			BT_ERR("Couldn't disable hostwake IRQ wakeup mode\n");
 +		free_irq(bsi->host_wake_irq, &bsi->pdev->dev);
-+		del_timer(&rx_timer);
++		timer_delete(&rx_timer);
 +		if (test_bit(BT_ASLEEP, &flags))
 +			hsuart_power(1);
 +	}
@@ -27558,9 +27814,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +	return 0;
 +}
 +
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/lpm.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/lpm.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/lpm.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/lpm.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/lpm.h b/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/lpm.h
+new file mode 100644
+index 000000000..0ff9dca14
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/lpm.h
 @@ -0,0 +1,21 @@
 +/*
 + * Copyright (C) 2015 Spreadtrum Communications Inc.
@@ -27583,96 +27841,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +
 +#endif
 +
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/Makefile linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/Makefile
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/Makefile	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/Makefile	2024-06-14 03:58:38.000000000 +0200
-@@ -0,0 +1,83 @@
-+CONFIG_AIC8800_BTLPM_SUPPORT = m
-+
-+obj-$(CONFIG_AIC8800_BTLPM_SUPPORT) := aic8800_btlpm.o
-+
-+ccflags-y += -I$(srctree)/$(src)/../aic8800_bsp
-+
-+# Platform support list
-+CONFIG_PLATFORM_ROCKCHIP ?= n
-+CONFIG_PLATFORM_ROCKCHIP2 ?= n
-+CONFIG_PLATFORM_ALLWINNER ?= n
-+CONFIG_PLATFORM_AMLOGIC ?= n
-+CONFIG_PLATFORM_UBUNTU ?= y
-+
-+
-+CONFIG_SUPPORT_LPM ?= n
-+CONFIG_AUTO_PM ?= n
-+
-+aic8800_btlpm-y := \
-+	aic_bluetooth_main.o \
-+	rfkill.o \
-+
-+aic8800_btlpm-$(CONFIG_SUPPORT_LPM) += lpm.o
-+
-+ccflags-y += -DAIC_TRACE_INCLUDE_PATH=$(src)
-+
-+ccflags-$(CONFIG_AUTO_PM) += -DCONFIG_AUTO_PM
-+
-+ifeq ($(CONFIG_PLATFORM_ROCKCHIP), y)
-+ARCH = arm64
-+KDIR = /home/yaya/E/Rockchip/3566/firefly/Android11.0/Firefly-RK356X_Android11.0_git_20210824/RK356X_Android11.0/kernel
-+CROSS_COMPILE = /home/yaya/E/Rockchip/3566/firefly/Android11.0/Firefly-RK356X_Android11.0_git_20210824/RK356X_Android11.0/prebuilts/gcc/linux-x86/aarch64/gcc-linaro-6.3.1-2017.05-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-
-+ccflags-$(CONFIG_PLATFORM_ROCKCHIP) += -DCONFIG_PLATFORM_ROCKCHIP
-+ccflags-y += -DANDROID_PLATFORM
-+endif
-+
-+ifeq ($(CONFIG_PLATFORM_ROCKCHIP2), y)
-+ARCH = arm64
-+KDIR = /home/yaya/E/Rockchip/3566/firefly/Android11.0/Firefly-RK356X_Android11.0_git_20210824/RK356X_Android11.0/kernel
-+CROSS_COMPILE = /home/yaya/E/Rockchip/3566/firefly/Android11.0/Firefly-RK356X_Android11.0_git_20210824/RK356X_Android11.0/prebuilts/gcc/linux-x86/aarch64/gcc-linaro-6.3.1-2017.05-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-
-+ccflags-$(CONFIG_PLATFORM_ROCKCHIP2) += -DCONFIG_PLATFORM_ROCKCHIP2
-+ccflags-y += -DANDROID_PLATFORM
-+endif
-+
-+ifeq ($(CONFIG_PLATFORM_ALLWINNER), y)
-+ccflags-$(CONFIG_PLATFORM_ALLWINNER) += -DCONFIG_PLATFORM_ALLWINNER
-+KDIR  ?= /home/yaya/E/Allwinner/R818/R818/AndroidQ/lichee/kernel/linux-4.9/
-+ARCH ?= arm64
-+CROSS_COMPILE ?= /home/yaya/E/Allwinner/R818/R818/AndroidQ/android/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/bin/aarch64-linux-android-
-+ccflags-y += -DANDROID_PLATFORM
-+endif
-+
-+ifeq ($(CONFIG_PLATFORM_AMLOGIC), y)
-+ccflags-$(CONFIG_PLATFORM_NANOPI) += -DCONFIG_PLATFORM_NANOPI
-+ccflags-y += -DANDROID_PLATFORM
-+endif
-+
-+ifeq ($(CONFIG_PLATFORM_UBUNTU), y)
-+KDIR  ?= /lib/modules/$(shell uname -r)/build
-+PWD   ?= $(shell pwd)
-+KVER ?= $(shell uname -r)
-+MODDESTDIR ?= /lib/modules/$(KVER)/kernel/drivers/net/wireless/
-+ARCH ?= x86_64
-+CROSS_COMPILE ?=
-+endif
-+
-+
-+all: modules
-+modules:
-+	make -C $(KDIR) M=$(PWD) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) modules
-+
-+install:
-+	mkdir -p $(MODDESTDIR)
-+	install -p -m 644 $(MODULE_NAME).ko  $(MODDESTDIR)
-+	/sbin/depmod -a ${KVER}
-+
-+uninstall:
-+	rm -rfv $(MODDESTDIR)/$(MODULE_NAME).ko
-+	/sbin/depmod -a ${KVER}
-+
-+clean:
-+	rm -rf *.o *.ko *.o.* *.mod.* modules.* Module.* .a* .o* .*.o.* *.mod .tmp* .cache.mk
-+
-+
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/rfkill.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/rfkill.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/rfkill.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/rfkill.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/rfkill.c b/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/rfkill.c
+new file mode 100644
+index 000000000..5caf3f83a
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/rfkill.c
 @@ -0,0 +1,81 @@
 +/*
 + * This software is licensed under the terms of the GNU General Public
@@ -27755,9 +27928,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +	return 0;
 +}
 +
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/rfkill.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/rfkill.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/rfkill.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/rfkill.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/rfkill.h b/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/rfkill.h
+new file mode 100644
+index 000000000..ce0d5761a
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_btlpm/rfkill.h
 @@ -0,0 +1,17 @@
 +/*
 + * This software is licensed under the terms of the GNU General Public
@@ -27776,9 +27951,408 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +int rfkill_bluetooth_remove(struct platform_device *pdev);
 +
 +#endif
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_br_ext.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_br_ext.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_br_ext.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_br_ext.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/Kconfig b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/Kconfig
+new file mode 100644
+index 000000000..c26f2b4af
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/Kconfig
+@@ -0,0 +1,5 @@
++config AIC8800_WLAN_SUPPORT
++	tristate "AIC8800 wlan Support"
++	help
++	  This is support for aic wifi driver.
++
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/Makefile b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/Makefile
+new file mode 100644
+index 000000000..8c10df7e1
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/Makefile
+@@ -0,0 +1,380 @@
++EXTRA_CFLAGS += $(USER_EXTRA_CFLAGS)
++EXTRA_CFLAGS += -Wno-implicit-fallthrough
++#EXTRA_CFLAGS += -Wno-unused-function
++#EXTRA_CFLAGS += -Wno-maybe-uninitialized
++#EXTRA_CFLAGS += -Wno-unused-variable
++
++RWNX_VERS_NUM := 6.4.3.0
++
++CONFIG_COUNTRY_CODE = "00"
++
++MODULE_NAME = aic8800_fdrv
++CONFIG_AIC8800_WLAN_SUPPORT = m
++
++# Support of bootrom start
++CONFIG_START_FROM_BOOTROM = y
++
++# Support of pmic setting, new version bootrom avaliable
++CONFIG_PMIC_SETTING ?=y
++
++# Select 8800DC/DW DCDC_VRF mode, check your board
++CONFIG_VRF_DCDC_MODE = y
++
++
++# ROM patch enabled option
++CONFIG_ROM_PATCH_EN ?=y
++# Support chip with mcu
++CONFIG_MCU_INTEGRATED ?= n
++CONFIG_MCU_MESSAGE ?= n
++ifeq ($(CONFIG_MCU_INTEGRATED), y)
++CONFIG_PMIC_SETTING = n
++else
++CONFIG_MCU_MESSAGE ?= n
++endif
++
++#
++# WAITING FOR KCONFIG {
++#
++CONFIG_RWNX_FULLMAC ?= y
++CONFIG_RWNX_FHOST ?= n
++
++#
++# DEBUG OPTIONS
++CONFIG_RWNX_UM_HELPER_DFLT ?= "/dini/dini_bin/rwnx_umh.sh"
++
++#
++# FW ARCH:
++CONFIG_RWNX_SDM ?= n
++CONFIG_RWNX_TL4 ?= n
++
++# IPC version
++CONFIG_RWNX_OLD_IPC ?= n
++
++# Support of P2P DebugFS for enabling/disabling NoA and OppPS
++CONFIG_RWNX_P2P_DEBUGFS := n
++#
++# } // WAITING FOR KCONFIG
++#
++
++# Enable A-MSDU support (need FW support)
++## Select this if FW is compiled with AMSDU support
++CONFIG_RWNX_SPLIT_TX_BUF ?= n
++## Select this TO send AMSDU
++CONFIG_RWNX_AMSDUS_TX ?= n
++
++# Enable BFMER support (need FW support)
++CONFIG_RWNX_BFMER ?= n
++
++CONFIG_SDIO_SUPPORT =y
++CONFIG_USB_SUPPORT =n
++CONFIG_RX_REORDER ?=y
++CONFIG_ARP_OFFLOAD =y
++CONFIG_RADAR_OR_IR_DETECT =n
++CONFIG_DOWNLOAD_FW =n
++CONFIG_RFTEST=y
++CONFIG_USB_BT =y
++CONFIG_SDIO_BT=n
++CONFIG_USE_5G ?= y
++CONFIG_SDIO_PWRCTRL ?= y
++CONFIG_CREATE_TRACE_POINTS = n
++CONFIG_TXRX_THREAD_PRIO = y
++# CONFIG_COEX = n for BT_ONLY, CONFIG_COEX =y for combo and sw
++CONFIG_COEX = y
++CONFIG_RX_NETIF_RECV_SKB = y
++CONFIG_GPIO_WAKEUP ?= n
++CONFIG_SET_VENDOR_EXTENSION_IE = n
++CONFIG_SUPPORT_REALTIME_CHANGE_MAC = y
++CONFIG_WPA3_FOR_OLD_KERNEL ?= n
++CONFIG_VHT_FOR_OLD_KERNEL ?= n
++CONFIG_HE_FOR_OLD_KERNEL ?= n
++CONFIG_PREALLOC_RX_SKB = n
++CONFIG_WIFI_SUSPEND_FOR_LINUX = n
++# Need to set fw path in BOARD_KERNEL_CMDLINE
++CONFIG_USE_FW_REQUEST = n
++CONFIG_USE_P2P0=n
++CONFIG_TX_NETIF_FLOWCTRL = n
++CONFIG_ONE_TXQ = n
++CONFIG_BR_SUPPORT =n
++BR_NAME = br0
++CONFIG_FDRV_NO_REG_SDIO=n
++CONFIG_SCHED_SCAN = n
++CONFIG_OOB ?= n
++CONFIG_USE_CUSTOMER_MAC = n
++CONFIG_PREALLOC_TXQ ?= y
++CONFIG_DPD = y
++CONFIG_FORCE_DPD_CALIB = y
++CONFIG_FILTER_TCP_ACK =n
++CONFIG_RESV_MEM_SUPPORT ?= y
++CONFIG_GKI = n
++CONFIG_TEMP_COMP = n
++# CONFIG_MCC = n for sta and p2p concurrent in same channel.
++CONFIG_MCC = y
++
++ifneq ($(CONFIG_WIRELESS_EXT), y)
++CONFIG_USE_WIRELESS_EXT = n
++endif
++
++# Support of MU-MIMO transmission (need FW support)
++ifeq ($(CONFIG_RWNX_BFMER), y)
++CONFIG_RWNX_MUMIMO_TX ?= n
++else
++CONFIG_RWNX_MUMIMO_TX = n
++endif
++
++# Enable handling of radar event
++CONFIG_RWNX_RADAR ?= y
++
++# Enable HW queue for Broadcast/Multicast traffic (need FW support)
++CONFIG_RWNX_BCMC ?= y
++
++# Enable Monitor+Data interface support (need FW support)
++CONFIG_RWNX_MON_DATA =y
++
++# extra DEBUG config
++CONFIG_RWNX_SW_PROFILING ?= n
++CONFIG_RWNX_DBG ?= y
++CONFIG_DEBUG_FS ?= n
++
++obj-$(CONFIG_AIC8800_WLAN_SUPPORT) := $(MODULE_NAME).o
++$(MODULE_NAME)-y := \
++	rwnx_msg_tx.o          \
++	rwnx_msg_rx.o          \
++	rwnx_utils.o           \
++	rwnx_cmds.o            \
++	rwnx_irqs.o            \
++	rwnx_cfgfile.o         \
++	rwnx_strs.o            \
++	rwnx_rx.o              \
++	rwnx_tx.o              \
++	rwnx_txq.o             \
++	rwnx_main.o            \
++	rwnx_mod_params.o      \
++	rwnx_mesh.o            \
++	rwnx_platform.o        \
++	rwnx_pci.o             \
++	rwnx_dini.o            \
++	rwnx_v7.o              \
++	ipc_host.o             \
++	rwnx_tdls.o            \
++	aic_vendor.o	       \
++	md5.o                  \
++	aicwf_compat_8800dc.o  \
++	aicwf_compat_8800d80.o \
++	rwnx_wakelock.o		\
++	regdb.o				   \
++	aicwf_rx_prealloc.o
++
++$(MODULE_NAME)-$(CONFIG_BR_SUPPORT)       += aic_br_ext.o
++$(MODULE_NAME)-$(CONFIG_RWNX_RADAR)       += rwnx_radar.o
++$(MODULE_NAME)-$(CONFIG_DEBUG_FS)         += rwnx_debugfs.o
++$(MODULE_NAME)-$(CONFIG_DEBUG_FS)         += rwnx_fw_trace.o
++$(MODULE_NAME)-$(CONFIG_NL80211_TESTMODE) += rwnx_testmode.o
++$(MODULE_NAME)-$(CONFIG_RWNX_BFMER)       += rwnx_bfmer.o
++$(MODULE_NAME)-$(CONFIG_RWNX_MUMIMO_TX)   += rwnx_mu_group.o
++$(MODULE_NAME)-$(CONFIG_SDIO_SUPPORT)     += sdio_host.o
++$(MODULE_NAME)-$(CONFIG_SDIO_SUPPORT)     += aicwf_txrxif.o
++$(MODULE_NAME)-$(CONFIG_SDIO_SUPPORT)     += aicwf_sdio.o
++$(MODULE_NAME)-$(CONFIG_FILTER_TCP_ACK)   += aicwf_tcp_ack.o
++$(MODULE_NAME)-$(CONFIG_SDIO_BT)   += aic_btsdio.o
++
++$(MODULE_NAME)-$(CONFIG_USB_SUPPORT)     += usb_host.o
++$(MODULE_NAME)-$(CONFIG_USB_SUPPORT)     += aicwf_txrxif.o
++$(MODULE_NAME)-$(CONFIG_USB_SUPPORT)     += aicwf_usb.o
++$(MODULE_NAME)-$(CONFIG_GKI)     += rwnx_gki.o
++
++
++
++ccflags-$(CONFIG_DEBUG_FS) += -DCONFIG_RWNX_DEBUGFS
++ccflags-$(CONFIG_DEBUG_FS) += -DCONFIG_RWNX_UM_HELPER_DFLT=\"$(CONFIG_RWNX_UM_HELPER_DFLT)\"
++ccflags-$(CONFIG_RWNX_P2P_DEBUGFS) += -DCONFIG_RWNX_P2P_DEBUGFS
++
++# FW VARS
++ccflags-y += -DNX_VIRT_DEV_MAX=4
++
++#for 8800D and DCDW u01
++#ccflags-y += -DNX_REMOTE_STA_MAX=10
++
++#for 8800DCDW u02
++ccflags-y += -DNX_REMOTE_STA_MAX_FOR_OLD_IC=10
++ccflags-y += -DNX_REMOTE_STA_MAX=32
++
++ccflags-y += -DNX_MU_GROUP_MAX=62
++ccflags-y += -DNX_TXDESC_CNT=64
++ccflags-y += -DNX_TX_MAX_RATES=4
++ccflags-y += -DNX_CHAN_CTXT_CNT=3
++
++# FW ARCH:
++ccflags-$(CONFIG_RWNX_SDM) += -DCONFIG_RWNX_SDM
++ccflags-$(CONFIG_RWNX_TL4) += -DCONFIG_RWNX_TL4
++ccflags-$(CONFIG_RWNX_OLD_IPC) += -DCONFIG_RWNX_OLD_IPC
++ccflags-$(CONFIG_PLATFORM_NANOPI_M4) += -DCONFIG_NANOPI_M4
++ccflags-$(CONFIG_PLATFORM_INGENIC_T20) += -DCONFIG_INGENIC_T20
++ccflags-$(CONFIG_PLATFORM_ALLWINNER) += -DCONFIG_PLATFORM_ALLWINNER
++ccflags-$(CONFIG_START_FROM_BOOTROM) += -DCONFIG_START_FROM_BOOTROM
++ccflags-$(CONFIG_PMIC_SETTING) += -DCONFIG_PMIC_SETTING
++ccflags-$(CONFIG_VRF_DCDC_MODE) += -DCONFIG_VRF_DCDC_MODE
++ccflags-$(CONFIG_ROM_PATCH_EN) += -DCONFIG_ROM_PATCH_EN
++ccflags-$(CONFIG_HE_FOR_OLD_KERNEL) += -DCONFIG_HE_FOR_OLD_KERNEL
++ccflags-$(CONFIG_MCU_INTEGRATED) += -DCONFIG_MCU_INTEGRATED
++ccflags-$(CONFIG_MCU_MESSAGE) += -DCONFIG_MCU_MESSAGE
++ccflags-$(CONFIG_COEX) += -DCONFIG_COEX
++
++ccflags-y += -DCONFIG_RWNX_FULLMAC
++ccflags-y += -I$(srctree)
++ccflags-y += -I$(srctree)/$(src)
++ccflags-y += -I$(srctree)/$(src)/../aic8800_bsp
++ccflags-y += -DCONFIG_AIC_FW_PATH=\"$(CONFIG_AIC_FW_PATH)\"
++ccflags-$(CONFIG_RWNX_RADAR) += -DCONFIG_RWNX_RADAR
++ccflags-$(CONFIG_RWNX_MON_DATA) += -DCONFIG_RWNX_MON_DATA
++ccflags-$(CONFIG_RWNX_BFMER) += -DCONFIG_RWNX_BFMER
++ccflags-$(CONFIG_RWNX_SPLIT_TX_BUF) += -DCONFIG_RWNX_SPLIT_TX_BUF
++ifeq ($(CONFIG_RWNX_SPLIT_TX_BUF), y)
++ccflags-$(CONFIG_RWNX_AMSDUS_TX) += -DCONFIG_RWNX_AMSDUS_TX
++endif
++ccflags-$(CONFIG_RWNX_DBG) += -DCONFIG_RWNX_DBG
++ccflags-$(CONFIG_RWNX_SW_PROFILING) += -DCONFIG_RWNX_SW_PROFILING
++ccflags-$(CONFIG_RWNX_MUMIMO_TX) += -DCONFIG_RWNX_MUMIMO_TX
++ccflags-$(CONFIG_RFTEST) += -DCONFIG_RFTEST
++ccflags-y += -DDEFAULT_COUNTRY_CODE=""\$(CONFIG_COUNTRY_CODE)"\"
++ccflags-$(CONFIG_USE_5G) += -DUSE_5G
++ccflags-$(CONFIG_CREATE_TRACE_POINTS) += -DCREATE_TRACE_POINTS
++ccflags-$(CONFIG_TXRX_THREAD_PRIO) += -DCONFIG_TXRX_THREAD_PRIO
++ccflags-$(CONFIG_GPIO_WAKEUP) += -DCONFIG_GPIO_WAKEUP
++ccflags-$(CONFIG_SET_VENDOR_EXTENSION_IE) += -DCONFIG_SET_VENDOR_EXTENSION_IE
++ccflags-$(CONFIG_SUPPORT_REALTIME_CHANGE_MAC) += -DCONFIG_SUPPORT_REALTIME_CHANGE_MAC
++ccflags-$(CONFIG_WPA3_FOR_OLD_KERNEL) += -DCONFIG_WPA3_FOR_OLD_KERNEL
++ccflags-$(CONFIG_VHT_FOR_OLD_KERNEL) += -DCONFIG_VHT_FOR_OLD_KERNEL
++ccflags-$(CONFIG_PREALLOC_RX_SKB) += -DCONFIG_PREALLOC_RX_SKB
++ccflags-$(CONFIG_WIFI_SUSPEND_FOR_LINUX) += -DCONFIG_WIFI_SUSPEND_FOR_LINUX
++ccflags-$(CONFIG_USE_FW_REQUEST) += -DCONFIG_USE_FW_REQUEST
++ccflags-$(CONFIG_USE_P2P0) += -DCONFIG_USE_P2P0
++ccflags-$(CONFIG_FDRV_NO_REG_SDIO) += -DCONFIG_FDRV_NO_REG_SDIO
++ccflags-$(CONFIG_SCHED_SCAN) += -DCONFIG_SCHED_SCAN
++ccflags-$(CONFIG_OOB) += -DCONFIG_OOB
++ccflags-$(CONFIG_USE_CUSTOMER_MAC) += -DCONFIG_USE_CUSTOMER_MAC
++ccflags-$(CONFIG_PREALLOC_TXQ) += -DCONFIG_PREALLOC_TXQ
++ccflags-$(CONFIG_DPD) += -DCONFIG_DPD
++ccflags-$(CONFIG_FORCE_DPD_CALIB) += -DCONFIG_FORCE_DPD_CALIB -DCONFIG_DPD
++ccflags-$(CONFIG_FILTER_TCP_ACK) += -DCONFIG_FILTER_TCP_ACK
++ccflags-$(CONFIG_SDIO_BT) += -DCONFIG_SDIO_BT
++ccflags-$(CONFIG_RESV_MEM_SUPPORT) += -DCONFIG_RESV_MEM_SUPPORT
++ccflags-$(CONFIG_GKI) += -DCONFIG_GKI
++ccflags-$(CONFIG_TEMP_COMP) += -DCONFIG_TEMP_COMP
++ccflags-$(CONFIG_MCC) += -DCONFIG_MCC
++
++
++ifeq ($(CONFIG_SDIO_SUPPORT), y)
++ccflags-y += -DAICWF_SDIO_SUPPORT
++ccflags-$(CONFIG_SDIO_PWRCTRL) += -DCONFIG_SDIO_PWRCTRL
++endif
++
++ifeq ($(CONFIG_USB_SUPPORT), y)
++ccflags-y += -DAICWF_USB_SUPPORT
++endif
++
++ifeq ($(CONFIG_BR_SUPPORT), y)
++ccflags-y += -DCONFIG_BR_SUPPORT
++ccflags-y += '-DCONFIG_BR_SUPPORT_BRNAME="'$(BR_NAME)'"'
++endif
++
++ifeq ($(CONFIG_RWNX_MUMIMO_TX), y)
++ccflags-y += -DCONFIG_USER_MAX=2
++else
++ccflags-y += -DCONFIG_USER_MAX=1
++endif
++
++ifeq ($(CONFIG_RWNX_BCMC), y)
++ccflags-y += -DNX_TXQ_CNT=5
++else
++ccflags-y += -DNX_TXQ_CNT=4
++endif
++
++# For old kernel (<=3.19)
++ifeq ($(shell test $(VERSION) -lt 4 -a "$(CONFIG_VENDOR_RWNX)" = y ; echo $$?),0)
++ccflags-y += -DCONFIG_VENDOR_RWNX_VHT_NO80
++endif
++
++ccflags-$(CONFIG_RX_REORDER) += -DAICWF_RX_REORDER
++ccflags-$(CONFIG_ARP_OFFLOAD) += -DAICWF_ARP_OFFLOAD
++ccflags-$(CONFIG_RADAR_DETECT) += -DRADAR_OR_IR_DETECT
++ccflags-$(CONFIG_DOWNLOAD_FW)  += -DCONFIG_DOWNLOAD_FW
++ccflags-$(CONFIG_RX_NETIF_RECV_SKB) += -DCONFIG_RX_NETIF_RECV_SKB
++ccflags-$(CONFIG_ONE_TXQ)  += -DCONFIG_ONE_TXQ
++ccflags-$(CONFIG_TX_NETIF_FLOWCTRL) += -DCONFIG_TX_NETIF_FLOWCTRL
++
++ccflags-y += -DAIC_TRACE_INCLUDE_PATH=$(src)
++MAKEFLAGS +=-j$(shell nproc)
++
++########## Platform support list ##########
++CONFIG_PLATFORM_ROCKCHIP ?= n
++CONFIG_PLATFORM_ROCKCHIP2 ?= n
++CONFIG_PLATFORM_ALLWINNER ?= n
++CONFIG_PLATFORM_INGENIC_T20 ?= n
++CONFIG_PLATFORM_AMLOGIC ?= n
++CONFIG_PLATFORM_UBUNTU ?= y
++
++ifeq ($(CONFIG_PLATFORM_ROCKCHIP), y)
++ARCH := arm64
++KDIR ?= /home/yaya/E/Rockchip/3566/firefly/Android11.0/Firefly-RK356X_Android11.0_git_20210824/RK356X_Android11.0/kernel
++CROSS_COMPILE := /home/yaya/E/Rockchip/3566/firefly/Android11.0/Firefly-RK356X_Android11.0_git_20210824/RK356X_Android11.0/prebuilts/gcc/linux-x86/aarch64/gcc-linaro-6.3.1-2017.05-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-
++ccflags-$(CONFIG_PLATFORM_ROCKCHIP) += -DCONFIG_PLATFORM_ROCKCHIP
++ccflags-y += -DANDROID_PLATFORM
++endif
++
++ifeq ($(CONFIG_PLATFORM_ROCKCHIP2), y)
++ARCH := arm64
++KDIR ?= /home/yaya/E/Rockchip/3566/firefly/Android11.0/Firefly-RK356X_Android11.0_git_20210824/RK356X_Android11.0/kernel
++CROSS_COMPILE := /home/yaya/E/Rockchip/3566/firefly/Android11.0/Firefly-RK356X_Android11.0_git_20210824/RK356X_Android11.0/prebuilts/gcc/linux-x86/aarch64/gcc-linaro-6.3.1-2017.05-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-
++
++ccflags-$(CONFIG_PLATFORM_ROCKCHIP2) += -DCONFIG_PLATFORM_ROCKCHIP2
++ccflags-y += -DANDROID_PLATFORM
++endif
++
++
++ifeq ($(CONFIG_PLATFORM_ALLWINNER), y)
++ccflags-$(CONFIG_PLATFORM_ALLWINNER) += -DCONFIG_PLATFORM_ALLWINNER
++ccflags-y += -DANDROID_PLATFORM
++KDIR  ?= /home/yaya/E/Allwinner/r818/Android10/lichee/kernel/linux-4.9/
++ARCH ?= arm64
++CROSS_COMPILE ?= /home/yaya/E/Allwinner/r818/Android10/android/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/bin/aarch64-linux-android-
++endif
++
++ifeq ($(CONFIG_PLATFORM_INGENIC_T20), y)
++KDIR ?= /home/yaya/E/T40/kernel
++ARCH ?= mips
++CROSS_COMPILE ?= /home/yaya/E/T40/mips-linux-gnu-ingenic-gcc7.2.0-glibc2.29-fp64/bin/mips-linux-gnu-
++endif
++
++ifeq ($(CONFIG_PLATFORM_AMLOGIC), y)
++ccflags-$(CONFIG_PLATFORM_AMLOGIC) += -DCONFIG_PLATFORM_AMLOGIC
++ccflags-y += -DANDROID_PLATFORM
++endif
++
++ifeq ($(CONFIG_PLATFORM_UBUNTU), y)
++KDIR  ?= /lib/modules/$(shell uname -r)/build
++PWD   ?= $(shell pwd)
++KVER ?= $(shell uname -r)
++MODDESTDIR ?= /lib/modules/$(KVER)/kernel/drivers/net/wireless/
++ARCH ?= x86_64
++CROSS_COMPILE ?=
++endif
++###########################################
++
++
++all: modules
++modules:
++	make -C $(KDIR) M=$(PWD) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) modules
++
++install:
++	mkdir -p $(MODDESTDIR)
++	install -p -m 644 $(MODULE_NAME).ko  $(MODDESTDIR)
++	/sbin/depmod -a ${KVER}
++
++uninstall:
++	rm -rfv $(MODDESTDIR)/$(MODULE_NAME).ko
++	/sbin/depmod -a ${KVER}
++
++clean:
++	rm -rf *.o *.ko *.o.* *.mod.* modules.* Module.* .a* .o* .*.o.* *.mod .tmp* .cache.mk
++
++
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_br_ext.c b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_br_ext.c
+new file mode 100644
+index 000000000..dd038e39f
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_br_ext.c
 @@ -0,0 +1,1569 @@
 +/******************************************************************************
 + *
@@ -29349,9 +29923,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +}
 +
 +#endif /* CONFIG_BR_SUPPORT */
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_br_ext.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_br_ext.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_br_ext.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_br_ext.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_br_ext.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_br_ext.h
+new file mode 100644
+index 000000000..71ebeb293
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_br_ext.h
 @@ -0,0 +1,73 @@
 +/******************************************************************************
 + *
@@ -29426,9 +30002,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +void nat25_db_cleanup(struct rwnx_vif *vif);
 +
 +#endif /* _AIC_BR_EXT_H_ */
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_bsp_export.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_bsp_export.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_bsp_export.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_bsp_export.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_bsp_export.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_bsp_export.h
+new file mode 100644
+index 000000000..bd806fad5
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_bsp_export.h
 @@ -0,0 +1,58 @@
 +#ifndef __AIC_BSP_EXPORT_H
 +#define __AIC_BSP_EXPORT_H
@@ -29488,9 +30066,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +void aicbsp_resv_mem_kfree_skb(struct sk_buff *skb, uint32_t id);
 +
 +#endif
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_btsdio.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_btsdio.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_btsdio.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_btsdio.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_btsdio.c b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_btsdio.c
+new file mode 100644
+index 000000000..643f94698
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_btsdio.c
 @@ -0,0 +1,1310 @@
 +#include <linux/kernel.h>
 +#include <linux/module.h>
@@ -30802,9 +31382,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +	hci_free_dev(hdev);
 +}
 +
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_btsdio.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_btsdio.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_btsdio.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_btsdio.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_btsdio.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_btsdio.h
+new file mode 100644
+index 000000000..719c2c6bc
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_btsdio.h
 @@ -0,0 +1,549 @@
 +#ifndef _AICWF_SDIO_BT_H_
 +#define _AICWF_SDIO_BT_H_
@@ -31355,9 +31937,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +
 +#endif//_AICWF_SDIO_BT_H_
 +
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_vendor.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_vendor.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_vendor.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_vendor.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_vendor.c b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_vendor.c
+new file mode 100644
+index 000000000..0cc6d5a39
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_vendor.c
 @@ -0,0 +1,909 @@
 +#include "aic_vendor.h"
 +#include "rwnx_defs.h"
@@ -32268,9 +32852,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +#endif
 +	return 0;
 +}
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_vendor.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_vendor.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_vendor.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_vendor.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_vendor.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_vendor.h
+new file mode 100644
+index 000000000..0e1e3e0c7
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aic_vendor.h
 @@ -0,0 +1,346 @@
 +#ifndef _AIC_VENDOR_H
 +#define _AIC_VENDOR_H
@@ -32618,9 +33204,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +
 +#endif /* _AIC_VENDOR_H */
 +
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_compat_8800d80.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_compat_8800d80.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_compat_8800d80.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_compat_8800d80.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_compat_8800d80.c b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_compat_8800d80.c
+new file mode 100644
+index 000000000..7f50fe6bf
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_compat_8800d80.c
 @@ -0,0 +1,66 @@
 +#include "rwnx_main.h"
 +#include "rwnx_msg_tx.h"
@@ -32688,9 +33276,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +}
 +
 +
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_compat_8800d80.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_compat_8800d80.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_compat_8800d80.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_compat_8800d80.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_compat_8800d80.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_compat_8800d80.h
+new file mode 100644
+index 000000000..df3e9d963
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_compat_8800d80.h
 @@ -0,0 +1,9 @@
 +#ifndef _AICWF_COMPAT_8800D80_H_
 +#define _AICWF_COMPAT_8800D80_H_
@@ -32701,9 +33291,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +
 +#endif
 +
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_compat_8800dc.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_compat_8800dc.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_compat_8800dc.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_compat_8800dc.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_compat_8800dc.c b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_compat_8800dc.c
+new file mode 100644
+index 000000000..f817fc042
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_compat_8800dc.c
 @@ -0,0 +1,542 @@
 +#include "rwnx_main.h"
 +#include "rwnx_msg_tx.h"
@@ -33247,9 +33839,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +
 +}
 +
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_compat_8800dc.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_compat_8800dc.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_compat_8800dc.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_compat_8800dc.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_compat_8800dc.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_compat_8800dc.h
+new file mode 100644
+index 000000000..249703b68
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_compat_8800dc.h
 @@ -0,0 +1,15 @@
 +#include <linux/types.h>
 +#include "aic_bsp_export.h"
@@ -33266,9 +33860,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +int	rwnx_plat_userconfig_load_8800dw(struct rwnx_hw *rwnx_hw);
 +
 +
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_debug.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_debug.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_debug.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_debug.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_debug.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_debug.h
+new file mode 100644
+index 000000000..25a576656
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_debug.h
 @@ -0,0 +1,56 @@
 +
 +
@@ -33326,9 +33922,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +
 +
 +
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_rx_prealloc.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_rx_prealloc.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_rx_prealloc.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_rx_prealloc.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_rx_prealloc.c b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_rx_prealloc.c
+new file mode 100644
+index 000000000..59502b89a
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_rx_prealloc.c
 @@ -0,0 +1,97 @@
 +#include <linux/version.h>
 +#include <linux/init.h>
@@ -33427,9 +34025,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +}
 +#endif
 +
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_rx_prealloc.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_rx_prealloc.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_rx_prealloc.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_rx_prealloc.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_rx_prealloc.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_rx_prealloc.h
+new file mode 100644
+index 000000000..64a494aee
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_rx_prealloc.h
 @@ -0,0 +1,24 @@
 +#ifndef _AICWF_RX_PREALLOC_H_
 +#define _AICWF_RX_PREALLOC_H_
@@ -33456,9 +34056,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +#endif
 +#endif /* _AICWF_RX_PREALLOC_H_ */
 \ No newline at end of file
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_sdio.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_sdio.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_sdio.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_sdio.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_sdio.c b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_sdio.c
+new file mode 100644
+index 000000000..3ab130af7
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_sdio.c
 @@ -0,0 +1,2591 @@
 +/**
 + * aicwf_sdmmc.c
@@ -35599,7 +36201,7 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +	spin_lock_bh(&sdiodev->pwrctl_lock);
 +	if (!duration) {
 +		if (timer_pending(&sdiodev->timer))
-+			del_timer_sync(&sdiodev->timer);
++			timer_delete_sync(&sdiodev->timer);
 +	} else {
 +		sdiodev->active_duration = duration;
 +		timeout = msecs_to_jiffies(sdiodev->active_duration);
@@ -36051,9 +36653,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +}
 +#endif//CONFIG_WIFI_SUSPEND_FOR_LINUX
 +
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_sdio.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_sdio.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_sdio.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_sdio.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_sdio.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_sdio.h
+new file mode 100644
+index 000000000..4ca6de280
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_sdio.h
 @@ -0,0 +1,186 @@
 +/**
 + * aicwf_sdio.h
@@ -36241,9 +36845,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +#endif /* AICWF_SDIO_SUPPORT */
 +
 +#endif /*_AICWF_SDMMC_H_*/
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_tcp_ack.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_tcp_ack.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_tcp_ack.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_tcp_ack.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_tcp_ack.c b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_tcp_ack.c
+new file mode 100644
+index 000000000..fa30efd81
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_tcp_ack.c
 @@ -0,0 +1,633 @@
 +#include"aicwf_tcp_ack.h"
 +//#include"rwnx_tx.h"
@@ -36353,7 +36959,7 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +		drop_msg = NULL;
 +
 +		write_seqlock_bh(&ack_m->ack_info[i].seqlock);
-+		del_timer(&ack_m->ack_info[i].timer);
++		timer_delete(&ack_m->ack_info[i].timer);
 +		drop_msg = ack_m->ack_info[i].msgbuf;
 +		ack_m->ack_info[i].msgbuf = NULL;
 +		write_sequnlock_bh(&ack_m->ack_info[i].seqlock);
@@ -36622,7 +37228,7 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +				//printk("%lx \n",ack_info->msgbuf);
 +				drop_msg = ack_info->msgbuf;
 +				ack_info->msgbuf = NULL;
-+				del_timer(&ack_info->timer);
++				timer_delete(&ack_info->timer);
 +			}else{
 +				//printk("msgbuf is NULL \n");
 +			}
@@ -36656,7 +37262,7 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +				   atomic_read(&ack_m->max_drop_cnt)))) {
 +			ack_info->drop_cnt = 0;
 +			ack_info->in_send_msg = new_msgbuf;
-+			del_timer(&ack_info->timer);
++			timer_delete(&ack_info->timer);
 +		} else {
 +			ret = 1;
 +			ack_info->msgbuf = new_msgbuf;
@@ -36719,7 +37325,7 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +			ack_info->drop_cnt = 0;
 +			send_msg = new_msgbuf;
 +			ack_info->in_send_msg = send_msg;
-+			del_timer(&ack_info->timer);
++			timer_delete(&ack_info->timer);
 +		}else{
 +			ret = 1;
 +			ack_info->msgbuf = new_msgbuf;
@@ -36878,9 +37484,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +	}
 +}
 +
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_tcp_ack.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_tcp_ack.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_tcp_ack.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_tcp_ack.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_tcp_ack.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_tcp_ack.h
+new file mode 100644
+index 000000000..d872e635c
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_tcp_ack.h
 @@ -0,0 +1,111 @@
 +#ifndef _AICWF_TCP_ACK_H_
 +#define _AICWF_TCP_ACK_H_
@@ -36993,9 +37601,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +
 +void move_tcpack_msg(struct rwnx_hw *priv, struct msg_buf * msg);
 +#endif
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_txrxif.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_txrxif.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_txrxif.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_txrxif.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_txrxif.c b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_txrxif.c
+new file mode 100644
+index 000000000..47613d7c6
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_txrxif.c
 @@ -0,0 +1,885 @@
 +/**
 + * aicwf_bus.c
@@ -37882,9 +38492,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +#endif
 +
 +
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_txrxif.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_txrxif.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_txrxif.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_txrxif.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_txrxif.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_txrxif.h
+new file mode 100644
+index 000000000..2a0644279
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_txrxif.h
 @@ -0,0 +1,262 @@
 +/**
 + * aicwf_txrxif.h
@@ -38148,9 +38760,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +#endif
 +
 +#endif /* _AICWF_TXRXIF_H_ */
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_usb.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_usb.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_usb.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_usb.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_usb.c b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_usb.c
+new file mode 100644
+index 000000000..9344217c2
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_usb.c
 @@ -0,0 +1,957 @@
 +/**
 + * aicwf_usb.c
@@ -39109,9 +39723,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +	usb_deregister(&aicwf_usbdrvr);
 +	kfree(g_rwnx_plat);
 +}
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_usb.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_usb.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_usb.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_usb.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_usb.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_usb.h
+new file mode 100644
+index 000000000..cc3619b2d
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/aicwf_usb.h
 @@ -0,0 +1,99 @@
 +/**
 + * aicwf_usb.h
@@ -39212,23 +39828,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +
 +#endif /* AICWF_USB_SUPPORT */
 +#endif /* _AICWF_USB_H_       */
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/.gitignore linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/.gitignore
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/.gitignore	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/.gitignore	2024-06-14 03:58:38.000000000 +0200
-@@ -0,0 +1,10 @@
-+*.o
-+*.ko
-+*.order
-+*.symvers
-+*.o.d
-+*.o.cmd
-+*.ko.cmd
-+*.mod
-+*.mod.c
-+*.mod.cmd
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/hal_desc.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/hal_desc.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/hal_desc.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/hal_desc.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/hal_desc.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/hal_desc.h
+new file mode 100644
+index 000000000..17cb02526
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/hal_desc.h
 @@ -0,0 +1,353 @@
 +/**
 + ******************************************************************************
@@ -39583,9 +40187,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +
 +
 +#endif // _HAL_DESC_H_
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/ipc_compat.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/ipc_compat.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/ipc_compat.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/ipc_compat.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/ipc_compat.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/ipc_compat.h
+new file mode 100644
+index 000000000..069f69ee5
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/ipc_compat.h
 @@ -0,0 +1,25 @@
 +/**
 + ****************************************************************************************
@@ -39612,9 +40218,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +	} while (0)
 +
 +#endif /* _IPC_H_ */
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/ipc_host.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/ipc_host.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/ipc_host.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/ipc_host.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/ipc_host.c b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/ipc_host.c
+new file mode 100644
+index 000000000..7746f4097
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/ipc_host.c
 @@ -0,0 +1,52 @@
 +/**
 + ******************************************************************************
@@ -39668,9 +40276,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +};
 +
 +
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/ipc_host.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/ipc_host.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/ipc_host.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/ipc_host.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/ipc_host.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/ipc_host.h
+new file mode 100644
+index 000000000..583b66889
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/ipc_host.h
 @@ -0,0 +1,168 @@
 +/**
 + ******************************************************************************
@@ -39840,9 +40450,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +extern const int nx_txuser_cnt[];
 +
 +#endif // _IPC_HOST_H_
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/ipc_shared.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/ipc_shared.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/ipc_shared.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/ipc_shared.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/ipc_shared.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/ipc_shared.h
+new file mode 100644
+index 000000000..7e2fedcb1
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/ipc_shared.h
 @@ -0,0 +1,785 @@
 +/**
 + ****************************************************************************************
@@ -40629,18 +41241,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +
 +#endif // _IPC_SHARED_H_
 +
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/Kconfig linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/Kconfig
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/Kconfig	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/Kconfig	2024-06-14 03:58:38.000000000 +0200
-@@ -0,0 +1,5 @@
-+config AIC8800_WLAN_SUPPORT
-+	tristate "AIC8800 wlan Support"
-+	help
-+	  This is support for aic wifi driver.
-+
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/lmac_mac.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/lmac_mac.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/lmac_mac.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/lmac_mac.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/lmac_mac.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/lmac_mac.h
+new file mode 100644
+index 000000000..2753d4d23
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/lmac_mac.h
 @@ -0,0 +1,564 @@
 +/**
 + ****************************************************************************************
@@ -41206,9 +41811,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +};
 +#endif
 +#endif // LMAC_MAC_H_
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/lmac_msg.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/lmac_msg.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/lmac_msg.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/lmac_msg.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/lmac_msg.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/lmac_msg.h
+new file mode 100644
+index 000000000..91a4e2913
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/lmac_msg.h
 @@ -0,0 +1,3082 @@
 +/**
 + ****************************************************************************************
@@ -44292,9 +44899,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +
 +
 +#endif // LMAC_MSG_H_
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/lmac_types.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/lmac_types.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/lmac_types.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/lmac_types.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/lmac_types.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/lmac_types.h
+new file mode 100644
+index 000000000..83b112290
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/lmac_types.h
 @@ -0,0 +1,62 @@
 +/**
 + ****************************************************************************************
@@ -44358,393 +44967,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +
 +/// @} CO_INT
 +#endif // _LMAC_INT_H_
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/Makefile linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/Makefile
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/Makefile	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/Makefile	2024-06-14 03:58:38.000000000 +0200
-@@ -0,0 +1,380 @@
-+EXTRA_CFLAGS += $(USER_EXTRA_CFLAGS)
-+EXTRA_CFLAGS += -Wno-implicit-fallthrough
-+#EXTRA_CFLAGS += -Wno-unused-function
-+#EXTRA_CFLAGS += -Wno-maybe-uninitialized
-+#EXTRA_CFLAGS += -Wno-unused-variable
-+
-+RWNX_VERS_NUM := 6.4.3.0
-+
-+CONFIG_COUNTRY_CODE = "00"
-+
-+MODULE_NAME = aic8800_fdrv
-+CONFIG_AIC8800_WLAN_SUPPORT = m
-+
-+# Support of bootrom start
-+CONFIG_START_FROM_BOOTROM = y
-+
-+# Support of pmic setting, new version bootrom avaliable
-+CONFIG_PMIC_SETTING ?=y
-+
-+# Select 8800DC/DW DCDC_VRF mode, check your board
-+CONFIG_VRF_DCDC_MODE = y
-+
-+
-+# ROM patch enabled option
-+CONFIG_ROM_PATCH_EN ?=y
-+# Support chip with mcu
-+CONFIG_MCU_INTEGRATED ?= n
-+CONFIG_MCU_MESSAGE ?= n
-+ifeq ($(CONFIG_MCU_INTEGRATED), y)
-+CONFIG_PMIC_SETTING = n
-+else
-+CONFIG_MCU_MESSAGE ?= n
-+endif
-+
-+#
-+# WAITING FOR KCONFIG {
-+#
-+CONFIG_RWNX_FULLMAC ?= y
-+CONFIG_RWNX_FHOST ?= n
-+
-+#
-+# DEBUG OPTIONS
-+CONFIG_RWNX_UM_HELPER_DFLT ?= "/dini/dini_bin/rwnx_umh.sh"
-+
-+#
-+# FW ARCH:
-+CONFIG_RWNX_SDM ?= n
-+CONFIG_RWNX_TL4 ?= n
-+
-+# IPC version
-+CONFIG_RWNX_OLD_IPC ?= n
-+
-+# Support of P2P DebugFS for enabling/disabling NoA and OppPS
-+CONFIG_RWNX_P2P_DEBUGFS := n
-+#
-+# } // WAITING FOR KCONFIG
-+#
-+
-+# Enable A-MSDU support (need FW support)
-+## Select this if FW is compiled with AMSDU support
-+CONFIG_RWNX_SPLIT_TX_BUF ?= n
-+## Select this TO send AMSDU
-+CONFIG_RWNX_AMSDUS_TX ?= n
-+
-+# Enable BFMER support (need FW support)
-+CONFIG_RWNX_BFMER ?= n
-+
-+CONFIG_SDIO_SUPPORT =y
-+CONFIG_USB_SUPPORT =n
-+CONFIG_RX_REORDER ?=y
-+CONFIG_ARP_OFFLOAD =y
-+CONFIG_RADAR_OR_IR_DETECT =n
-+CONFIG_DOWNLOAD_FW =n
-+CONFIG_RFTEST=y
-+CONFIG_USB_BT =y
-+CONFIG_SDIO_BT=n
-+CONFIG_USE_5G ?= y
-+CONFIG_SDIO_PWRCTRL ?= y
-+CONFIG_CREATE_TRACE_POINTS = n
-+CONFIG_TXRX_THREAD_PRIO = y
-+# CONFIG_COEX = n for BT_ONLY, CONFIG_COEX =y for combo and sw
-+CONFIG_COEX = y
-+CONFIG_RX_NETIF_RECV_SKB = y
-+CONFIG_GPIO_WAKEUP ?= n
-+CONFIG_SET_VENDOR_EXTENSION_IE = n
-+CONFIG_SUPPORT_REALTIME_CHANGE_MAC = y
-+CONFIG_WPA3_FOR_OLD_KERNEL ?= n
-+CONFIG_VHT_FOR_OLD_KERNEL ?= n
-+CONFIG_HE_FOR_OLD_KERNEL ?= n
-+CONFIG_PREALLOC_RX_SKB = n
-+CONFIG_WIFI_SUSPEND_FOR_LINUX = n
-+# Need to set fw path in BOARD_KERNEL_CMDLINE
-+CONFIG_USE_FW_REQUEST = n
-+CONFIG_USE_P2P0=n
-+CONFIG_TX_NETIF_FLOWCTRL = n
-+CONFIG_ONE_TXQ = n
-+CONFIG_BR_SUPPORT =n
-+BR_NAME = br0
-+CONFIG_FDRV_NO_REG_SDIO=n
-+CONFIG_SCHED_SCAN = n
-+CONFIG_OOB ?= n
-+CONFIG_USE_CUSTOMER_MAC = n
-+CONFIG_PREALLOC_TXQ ?= y
-+CONFIG_DPD = y
-+CONFIG_FORCE_DPD_CALIB = y
-+CONFIG_FILTER_TCP_ACK =n
-+CONFIG_RESV_MEM_SUPPORT ?= y
-+CONFIG_GKI = n
-+CONFIG_TEMP_COMP = n
-+# CONFIG_MCC = n for sta and p2p concurrent in same channel.
-+CONFIG_MCC = y
-+
-+ifneq ($(CONFIG_WIRELESS_EXT), y)
-+CONFIG_USE_WIRELESS_EXT = n
-+endif
-+
-+# Support of MU-MIMO transmission (need FW support)
-+ifeq ($(CONFIG_RWNX_BFMER), y)
-+CONFIG_RWNX_MUMIMO_TX ?= n
-+else
-+CONFIG_RWNX_MUMIMO_TX = n
-+endif
-+
-+# Enable handling of radar event
-+CONFIG_RWNX_RADAR ?= y
-+
-+# Enable HW queue for Broadcast/Multicast traffic (need FW support)
-+CONFIG_RWNX_BCMC ?= y
-+
-+# Enable Monitor+Data interface support (need FW support)
-+CONFIG_RWNX_MON_DATA =y
-+
-+# extra DEBUG config
-+CONFIG_RWNX_SW_PROFILING ?= n
-+CONFIG_RWNX_DBG ?= y
-+CONFIG_DEBUG_FS ?= n
-+
-+obj-$(CONFIG_AIC8800_WLAN_SUPPORT) := $(MODULE_NAME).o
-+$(MODULE_NAME)-y := \
-+	rwnx_msg_tx.o          \
-+	rwnx_msg_rx.o          \
-+	rwnx_utils.o           \
-+	rwnx_cmds.o            \
-+	rwnx_irqs.o            \
-+	rwnx_cfgfile.o         \
-+	rwnx_strs.o            \
-+	rwnx_rx.o              \
-+	rwnx_tx.o              \
-+	rwnx_txq.o             \
-+	rwnx_main.o            \
-+	rwnx_mod_params.o      \
-+	rwnx_mesh.o            \
-+	rwnx_platform.o        \
-+	rwnx_pci.o             \
-+	rwnx_dini.o            \
-+	rwnx_v7.o              \
-+	ipc_host.o             \
-+	rwnx_tdls.o            \
-+	aic_vendor.o	       \
-+	md5.o                  \
-+	aicwf_compat_8800dc.o  \
-+	aicwf_compat_8800d80.o \
-+	rwnx_wakelock.o		\
-+	regdb.o				   \
-+	aicwf_rx_prealloc.o
-+
-+$(MODULE_NAME)-$(CONFIG_BR_SUPPORT)       += aic_br_ext.o
-+$(MODULE_NAME)-$(CONFIG_RWNX_RADAR)       += rwnx_radar.o
-+$(MODULE_NAME)-$(CONFIG_DEBUG_FS)         += rwnx_debugfs.o
-+$(MODULE_NAME)-$(CONFIG_DEBUG_FS)         += rwnx_fw_trace.o
-+$(MODULE_NAME)-$(CONFIG_NL80211_TESTMODE) += rwnx_testmode.o
-+$(MODULE_NAME)-$(CONFIG_RWNX_BFMER)       += rwnx_bfmer.o
-+$(MODULE_NAME)-$(CONFIG_RWNX_MUMIMO_TX)   += rwnx_mu_group.o
-+$(MODULE_NAME)-$(CONFIG_SDIO_SUPPORT)     += sdio_host.o
-+$(MODULE_NAME)-$(CONFIG_SDIO_SUPPORT)     += aicwf_txrxif.o
-+$(MODULE_NAME)-$(CONFIG_SDIO_SUPPORT)     += aicwf_sdio.o
-+$(MODULE_NAME)-$(CONFIG_FILTER_TCP_ACK)   += aicwf_tcp_ack.o
-+$(MODULE_NAME)-$(CONFIG_SDIO_BT)   += aic_btsdio.o
-+
-+$(MODULE_NAME)-$(CONFIG_USB_SUPPORT)     += usb_host.o
-+$(MODULE_NAME)-$(CONFIG_USB_SUPPORT)     += aicwf_txrxif.o
-+$(MODULE_NAME)-$(CONFIG_USB_SUPPORT)     += aicwf_usb.o
-+$(MODULE_NAME)-$(CONFIG_GKI)     += rwnx_gki.o
-+
-+
-+
-+ccflags-$(CONFIG_DEBUG_FS) += -DCONFIG_RWNX_DEBUGFS
-+ccflags-$(CONFIG_DEBUG_FS) += -DCONFIG_RWNX_UM_HELPER_DFLT=\"$(CONFIG_RWNX_UM_HELPER_DFLT)\"
-+ccflags-$(CONFIG_RWNX_P2P_DEBUGFS) += -DCONFIG_RWNX_P2P_DEBUGFS
-+
-+# FW VARS
-+ccflags-y += -DNX_VIRT_DEV_MAX=4
-+
-+#for 8800D and DCDW u01
-+#ccflags-y += -DNX_REMOTE_STA_MAX=10
-+
-+#for 8800DCDW u02
-+ccflags-y += -DNX_REMOTE_STA_MAX_FOR_OLD_IC=10
-+ccflags-y += -DNX_REMOTE_STA_MAX=32
-+
-+ccflags-y += -DNX_MU_GROUP_MAX=62
-+ccflags-y += -DNX_TXDESC_CNT=64
-+ccflags-y += -DNX_TX_MAX_RATES=4
-+ccflags-y += -DNX_CHAN_CTXT_CNT=3
-+
-+# FW ARCH:
-+ccflags-$(CONFIG_RWNX_SDM) += -DCONFIG_RWNX_SDM
-+ccflags-$(CONFIG_RWNX_TL4) += -DCONFIG_RWNX_TL4
-+ccflags-$(CONFIG_RWNX_OLD_IPC) += -DCONFIG_RWNX_OLD_IPC
-+ccflags-$(CONFIG_PLATFORM_NANOPI_M4) += -DCONFIG_NANOPI_M4
-+ccflags-$(CONFIG_PLATFORM_INGENIC_T20) += -DCONFIG_INGENIC_T20
-+ccflags-$(CONFIG_PLATFORM_ALLWINNER) += -DCONFIG_PLATFORM_ALLWINNER
-+ccflags-$(CONFIG_START_FROM_BOOTROM) += -DCONFIG_START_FROM_BOOTROM
-+ccflags-$(CONFIG_PMIC_SETTING) += -DCONFIG_PMIC_SETTING
-+ccflags-$(CONFIG_VRF_DCDC_MODE) += -DCONFIG_VRF_DCDC_MODE
-+ccflags-$(CONFIG_ROM_PATCH_EN) += -DCONFIG_ROM_PATCH_EN
-+ccflags-$(CONFIG_HE_FOR_OLD_KERNEL) += -DCONFIG_HE_FOR_OLD_KERNEL
-+ccflags-$(CONFIG_MCU_INTEGRATED) += -DCONFIG_MCU_INTEGRATED
-+ccflags-$(CONFIG_MCU_MESSAGE) += -DCONFIG_MCU_MESSAGE
-+ccflags-$(CONFIG_COEX) += -DCONFIG_COEX
-+
-+ccflags-y += -DCONFIG_RWNX_FULLMAC
-+ccflags-y += -I$(srctree)
-+ccflags-y += -I$(srctree)/$(src)
-+ccflags-y += -I$(srctree)/$(src)/../aic8800_bsp
-+ccflags-y += -DCONFIG_AIC_FW_PATH=\"$(CONFIG_AIC_FW_PATH)\"
-+ccflags-$(CONFIG_RWNX_RADAR) += -DCONFIG_RWNX_RADAR
-+ccflags-$(CONFIG_RWNX_MON_DATA) += -DCONFIG_RWNX_MON_DATA
-+ccflags-$(CONFIG_RWNX_BFMER) += -DCONFIG_RWNX_BFMER
-+ccflags-$(CONFIG_RWNX_SPLIT_TX_BUF) += -DCONFIG_RWNX_SPLIT_TX_BUF
-+ifeq ($(CONFIG_RWNX_SPLIT_TX_BUF), y)
-+ccflags-$(CONFIG_RWNX_AMSDUS_TX) += -DCONFIG_RWNX_AMSDUS_TX
-+endif
-+ccflags-$(CONFIG_RWNX_DBG) += -DCONFIG_RWNX_DBG
-+ccflags-$(CONFIG_RWNX_SW_PROFILING) += -DCONFIG_RWNX_SW_PROFILING
-+ccflags-$(CONFIG_RWNX_MUMIMO_TX) += -DCONFIG_RWNX_MUMIMO_TX
-+ccflags-$(CONFIG_RFTEST) += -DCONFIG_RFTEST
-+ccflags-y += -DDEFAULT_COUNTRY_CODE=""\$(CONFIG_COUNTRY_CODE)"\"
-+ccflags-$(CONFIG_USE_5G) += -DUSE_5G
-+ccflags-$(CONFIG_CREATE_TRACE_POINTS) += -DCREATE_TRACE_POINTS
-+ccflags-$(CONFIG_TXRX_THREAD_PRIO) += -DCONFIG_TXRX_THREAD_PRIO
-+ccflags-$(CONFIG_GPIO_WAKEUP) += -DCONFIG_GPIO_WAKEUP
-+ccflags-$(CONFIG_SET_VENDOR_EXTENSION_IE) += -DCONFIG_SET_VENDOR_EXTENSION_IE
-+ccflags-$(CONFIG_SUPPORT_REALTIME_CHANGE_MAC) += -DCONFIG_SUPPORT_REALTIME_CHANGE_MAC
-+ccflags-$(CONFIG_WPA3_FOR_OLD_KERNEL) += -DCONFIG_WPA3_FOR_OLD_KERNEL
-+ccflags-$(CONFIG_VHT_FOR_OLD_KERNEL) += -DCONFIG_VHT_FOR_OLD_KERNEL
-+ccflags-$(CONFIG_PREALLOC_RX_SKB) += -DCONFIG_PREALLOC_RX_SKB
-+ccflags-$(CONFIG_WIFI_SUSPEND_FOR_LINUX) += -DCONFIG_WIFI_SUSPEND_FOR_LINUX
-+ccflags-$(CONFIG_USE_FW_REQUEST) += -DCONFIG_USE_FW_REQUEST
-+ccflags-$(CONFIG_USE_P2P0) += -DCONFIG_USE_P2P0
-+ccflags-$(CONFIG_FDRV_NO_REG_SDIO) += -DCONFIG_FDRV_NO_REG_SDIO
-+ccflags-$(CONFIG_SCHED_SCAN) += -DCONFIG_SCHED_SCAN
-+ccflags-$(CONFIG_OOB) += -DCONFIG_OOB
-+ccflags-$(CONFIG_USE_CUSTOMER_MAC) += -DCONFIG_USE_CUSTOMER_MAC
-+ccflags-$(CONFIG_PREALLOC_TXQ) += -DCONFIG_PREALLOC_TXQ
-+ccflags-$(CONFIG_DPD) += -DCONFIG_DPD
-+ccflags-$(CONFIG_FORCE_DPD_CALIB) += -DCONFIG_FORCE_DPD_CALIB -DCONFIG_DPD
-+ccflags-$(CONFIG_FILTER_TCP_ACK) += -DCONFIG_FILTER_TCP_ACK
-+ccflags-$(CONFIG_SDIO_BT) += -DCONFIG_SDIO_BT
-+ccflags-$(CONFIG_RESV_MEM_SUPPORT) += -DCONFIG_RESV_MEM_SUPPORT
-+ccflags-$(CONFIG_GKI) += -DCONFIG_GKI
-+ccflags-$(CONFIG_TEMP_COMP) += -DCONFIG_TEMP_COMP
-+ccflags-$(CONFIG_MCC) += -DCONFIG_MCC
-+
-+
-+ifeq ($(CONFIG_SDIO_SUPPORT), y)
-+ccflags-y += -DAICWF_SDIO_SUPPORT
-+ccflags-$(CONFIG_SDIO_PWRCTRL) += -DCONFIG_SDIO_PWRCTRL
-+endif
-+
-+ifeq ($(CONFIG_USB_SUPPORT), y)
-+ccflags-y += -DAICWF_USB_SUPPORT
-+endif
-+
-+ifeq ($(CONFIG_BR_SUPPORT), y)
-+ccflags-y += -DCONFIG_BR_SUPPORT
-+ccflags-y += '-DCONFIG_BR_SUPPORT_BRNAME="'$(BR_NAME)'"'
-+endif
-+
-+ifeq ($(CONFIG_RWNX_MUMIMO_TX), y)
-+ccflags-y += -DCONFIG_USER_MAX=2
-+else
-+ccflags-y += -DCONFIG_USER_MAX=1
-+endif
-+
-+ifeq ($(CONFIG_RWNX_BCMC), y)
-+ccflags-y += -DNX_TXQ_CNT=5
-+else
-+ccflags-y += -DNX_TXQ_CNT=4
-+endif
-+
-+# For old kernel (<=3.19)
-+ifeq ($(shell test $(VERSION) -lt 4 -a "$(CONFIG_VENDOR_RWNX)" = y ; echo $$?),0)
-+ccflags-y += -DCONFIG_VENDOR_RWNX_VHT_NO80
-+endif
-+
-+ccflags-$(CONFIG_RX_REORDER) += -DAICWF_RX_REORDER
-+ccflags-$(CONFIG_ARP_OFFLOAD) += -DAICWF_ARP_OFFLOAD
-+ccflags-$(CONFIG_RADAR_DETECT) += -DRADAR_OR_IR_DETECT
-+ccflags-$(CONFIG_DOWNLOAD_FW)  += -DCONFIG_DOWNLOAD_FW
-+ccflags-$(CONFIG_RX_NETIF_RECV_SKB) += -DCONFIG_RX_NETIF_RECV_SKB
-+ccflags-$(CONFIG_ONE_TXQ)  += -DCONFIG_ONE_TXQ
-+ccflags-$(CONFIG_TX_NETIF_FLOWCTRL) += -DCONFIG_TX_NETIF_FLOWCTRL
-+
-+ccflags-y += -DAIC_TRACE_INCLUDE_PATH=$(src)
-+MAKEFLAGS +=-j$(shell nproc)
-+
-+########## Platform support list ##########
-+CONFIG_PLATFORM_ROCKCHIP ?= n
-+CONFIG_PLATFORM_ROCKCHIP2 ?= n
-+CONFIG_PLATFORM_ALLWINNER ?= n
-+CONFIG_PLATFORM_INGENIC_T20 ?= n
-+CONFIG_PLATFORM_AMLOGIC ?= n
-+CONFIG_PLATFORM_UBUNTU ?= y
-+
-+ifeq ($(CONFIG_PLATFORM_ROCKCHIP), y)
-+ARCH := arm64
-+KDIR ?= /home/yaya/E/Rockchip/3566/firefly/Android11.0/Firefly-RK356X_Android11.0_git_20210824/RK356X_Android11.0/kernel
-+CROSS_COMPILE := /home/yaya/E/Rockchip/3566/firefly/Android11.0/Firefly-RK356X_Android11.0_git_20210824/RK356X_Android11.0/prebuilts/gcc/linux-x86/aarch64/gcc-linaro-6.3.1-2017.05-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-
-+ccflags-$(CONFIG_PLATFORM_ROCKCHIP) += -DCONFIG_PLATFORM_ROCKCHIP
-+ccflags-y += -DANDROID_PLATFORM
-+endif
-+
-+ifeq ($(CONFIG_PLATFORM_ROCKCHIP2), y)
-+ARCH := arm64
-+KDIR ?= /home/yaya/E/Rockchip/3566/firefly/Android11.0/Firefly-RK356X_Android11.0_git_20210824/RK356X_Android11.0/kernel
-+CROSS_COMPILE := /home/yaya/E/Rockchip/3566/firefly/Android11.0/Firefly-RK356X_Android11.0_git_20210824/RK356X_Android11.0/prebuilts/gcc/linux-x86/aarch64/gcc-linaro-6.3.1-2017.05-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-
-+
-+ccflags-$(CONFIG_PLATFORM_ROCKCHIP2) += -DCONFIG_PLATFORM_ROCKCHIP2
-+ccflags-y += -DANDROID_PLATFORM
-+endif
-+
-+
-+ifeq ($(CONFIG_PLATFORM_ALLWINNER), y)
-+ccflags-$(CONFIG_PLATFORM_ALLWINNER) += -DCONFIG_PLATFORM_ALLWINNER
-+ccflags-y += -DANDROID_PLATFORM
-+KDIR  ?= /home/yaya/E/Allwinner/r818/Android10/lichee/kernel/linux-4.9/
-+ARCH ?= arm64
-+CROSS_COMPILE ?= /home/yaya/E/Allwinner/r818/Android10/android/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/bin/aarch64-linux-android-
-+endif
-+
-+ifeq ($(CONFIG_PLATFORM_INGENIC_T20), y)
-+KDIR ?= /home/yaya/E/T40/kernel
-+ARCH ?= mips
-+CROSS_COMPILE ?= /home/yaya/E/T40/mips-linux-gnu-ingenic-gcc7.2.0-glibc2.29-fp64/bin/mips-linux-gnu-
-+endif
-+
-+ifeq ($(CONFIG_PLATFORM_AMLOGIC), y)
-+ccflags-$(CONFIG_PLATFORM_AMLOGIC) += -DCONFIG_PLATFORM_AMLOGIC
-+ccflags-y += -DANDROID_PLATFORM
-+endif
-+
-+ifeq ($(CONFIG_PLATFORM_UBUNTU), y)
-+KDIR  ?= /lib/modules/$(shell uname -r)/build
-+PWD   ?= $(shell pwd)
-+KVER ?= $(shell uname -r)
-+MODDESTDIR ?= /lib/modules/$(KVER)/kernel/drivers/net/wireless/
-+ARCH ?= x86_64
-+CROSS_COMPILE ?=
-+endif
-+###########################################
-+
-+
-+all: modules
-+modules:
-+	make -C $(KDIR) M=$(PWD) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) modules
-+
-+install:
-+	mkdir -p $(MODDESTDIR)
-+	install -p -m 644 $(MODULE_NAME).ko  $(MODDESTDIR)
-+	/sbin/depmod -a ${KVER}
-+
-+uninstall:
-+	rm -rfv $(MODDESTDIR)/$(MODULE_NAME).ko
-+	/sbin/depmod -a ${KVER}
-+
-+clean:
-+	rm -rf *.o *.ko *.o.* *.mod.* modules.* Module.* .a* .o* .*.o.* *.mod .tmp* .cache.mk
-+
-+
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/md5.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/md5.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/md5.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/md5.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/md5.c b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/md5.c
+new file mode 100644
+index 000000000..3d7b65375
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/md5.c
 @@ -0,0 +1,161 @@
 +#include <linux/memory.h>
 +#include "md5.h"
@@ -44907,9 +45134,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +     state[2] += c;
 +     state[3] += d;
 +}
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/md5.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/md5.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/md5.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/md5.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/md5.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/md5.h
+new file mode 100644
+index 000000000..6ed5c0f8e
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/md5.h
 @@ -0,0 +1,48 @@
 +#ifndef MD5_H
 +#define MD5_H
@@ -44959,9 +45188,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +void MD5Decode(unsigned int *output,unsigned char *input,unsigned int len);
 + 
 +#endif
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/reg_access.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/reg_access.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/reg_access.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/reg_access.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/reg_access.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/reg_access.h
+new file mode 100644
+index 000000000..568146624
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/reg_access.h
 @@ -0,0 +1,148 @@
 +/**
 + ******************************************************************************
@@ -45111,9 +45342,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +	(*(volatile u32 *)((u8 *)env + IPC_REG_BASE_ADDR + 4 * (INDEX)) = value)
 +
 +#endif /* REG_ACCESS_H_ */
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/regdb.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/regdb.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/regdb.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/regdb.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/regdb.c b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/regdb.c
+new file mode 100644
+index 000000000..0f8777066
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/regdb.c
 @@ -0,0 +1,2898 @@
 +#include <linux/nl80211.h>
 +#include <net/cfg80211.h>
@@ -48013,9 +48246,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +int reg_regdb_size = ARRAY_SIZE(reg_regdb);
 +
 +
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_bfmer.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_bfmer.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_bfmer.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_bfmer.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_bfmer.c b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_bfmer.c
+new file mode 100644
+index 000000000..b39cf0f20
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_bfmer.c
 @@ -0,0 +1,105 @@
 +/**
 + ******************************************************************************
@@ -48122,9 +48357,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +	return rx_nss;
 +}
 +#endif /* CONFIG_RWNX_FULLMAC */
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_bfmer.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_bfmer.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_bfmer.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_bfmer.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_bfmer.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_bfmer.h
+new file mode 100644
+index 000000000..4ce16496e
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_bfmer.h
 @@ -0,0 +1,100 @@
 +/**
 + ******************************************************************************
@@ -48226,9 +48463,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +#endif /* CONFIG_RWNX_FULLMAC */
 +
 +#endif /* _RWNX_BFMER_H_ */
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_cfgfile.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_cfgfile.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_cfgfile.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_cfgfile.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_cfgfile.c b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_cfgfile.c
+new file mode 100644
+index 000000000..39a5a2514
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_cfgfile.c
 @@ -0,0 +1,239 @@
 +/**
 + ****************************************************************************************
@@ -48469,9 +48708,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +	return 0;
 +}
 +
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_cfgfile.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_cfgfile.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_cfgfile.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_cfgfile.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_cfgfile.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_cfgfile.h
+new file mode 100644
+index 000000000..7dc96fe58
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_cfgfile.h
 @@ -0,0 +1,35 @@
 +/**
 + ****************************************************************************************
@@ -48508,9 +48749,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +							  struct rwnx_phy_conf_file *config, int path);
 +
 +#endif /* _RWNX_CFGFILE_H_ */
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_cmds.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_cmds.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_cmds.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_cmds.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_cmds.c b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_cmds.c
+new file mode 100644
+index 000000000..36f4686ed
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_cmds.c
 @@ -0,0 +1,539 @@
 +/**
 + ******************************************************************************
@@ -49051,9 +49294,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +	aicwf_bus_txmsg(bus, buffer, len + 8);
 +}
 +
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_cmds.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_cmds.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_cmds.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_cmds.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_cmds.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_cmds.h
+new file mode 100644
+index 000000000..b757a65cf
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_cmds.h
 @@ -0,0 +1,124 @@
 +/**
 + ******************************************************************************
@@ -49179,9 +49424,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +void aicwf_set_cmd_tx(void *dev, struct lmac_msg *msg, uint len);
 +
 +#endif /* _RWNX_CMDS_H_ */
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_compat.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_compat.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_compat.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_compat.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_compat.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_compat.h
+new file mode 100644
+index 000000000..9287eca60
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_compat.h
 @@ -0,0 +1,446 @@
 +/**
 + ******************************************************************************
@@ -49629,9 +49876,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +#endif
 +
 +#endif /* _RWNX_COMPAT_H_ */
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_debugfs.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_debugfs.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_debugfs.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_debugfs.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_debugfs.c b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_debugfs.c
+new file mode 100644
+index 000000000..5a2840805
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_debugfs.c
 @@ -0,0 +1,2455 @@
 +/**
 + ******************************************************************************
@@ -52088,9 +52337,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +
 +#endif /* CONFIG_DEBUG_FS */
 +
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_debugfs.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_debugfs.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_debugfs.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_debugfs.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_debugfs.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_debugfs.h
+new file mode 100644
+index 000000000..7f5c7c9c5
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_debugfs.h
 @@ -0,0 +1,202 @@
 +/**
 + ******************************************************************************
@@ -52294,9 +52545,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +
 +
 +#endif /* _RWNX_DEBUGFS_H_ */
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_defs.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_defs.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_defs.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_defs.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_defs.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_defs.h
+new file mode 100644
+index 000000000..4e966dee2
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_defs.h
 @@ -0,0 +1,746 @@
 +/**
 + ******************************************************************************
@@ -53044,9 +53297,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +void rwnx_external_auth_disable(struct rwnx_vif *vif);
 +
 +#endif /* _RWNX_DEFS_H_ */
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_dini.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_dini.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_dini.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_dini.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_dini.c b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_dini.c
+new file mode 100644
+index 000000000..17d55da11
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_dini.c
 @@ -0,0 +1,297 @@
 +/**
 + ******************************************************************************
@@ -53345,9 +53600,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +	kfree(*rwnx_plat);
 +	return ret;
 +}
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_dini.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_dini.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_dini.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_dini.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_dini.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_dini.h
+new file mode 100644
+index 000000000..d9f57c10e
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_dini.h
 @@ -0,0 +1,20 @@
 +/**
 + ****************************************************************************************
@@ -53369,9 +53626,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +							struct rwnx_plat **rwnx_plat);
 +
 +#endif /* _RWNX_DINI_H_ */
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_events.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_events.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_events.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_events.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_events.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_events.h
+new file mode 100644
+index 000000000..3bd59807f
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_events.h
 @@ -0,0 +1,1326 @@
 +/**
 + ******************************************************************************
@@ -54699,9 +54958,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +#define TRACE_INCLUDE_PATH AIC_TRACE_INCLUDE_PATH
 +#define TRACE_INCLUDE_FILE rwnx_events
 +#include <trace/define_trace.h>
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_fw_trace.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_fw_trace.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_fw_trace.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_fw_trace.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_fw_trace.c b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_fw_trace.c
+new file mode 100644
+index 000000000..9151c8b81
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_fw_trace.c
 @@ -0,0 +1,48 @@
 +/**
 + ******************************************************************************
@@ -54751,9 +55012,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +	fw_log->buf.size = 0;
 +}
 +
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_fw_trace.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_fw_trace.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_fw_trace.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_fw_trace.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_fw_trace.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_fw_trace.h
+new file mode 100644
+index 000000000..795679095
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_fw_trace.h
 @@ -0,0 +1,35 @@
 +/**
 + ******************************************************************************
@@ -54790,9 +55053,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +int rwnx_fw_log_init(struct rwnx_fw_log *fw_log);
 +void rwnx_fw_log_deinit(struct rwnx_fw_log *fw_log);
 +#endif /* _RWNX_FW_TRACE_H_ */
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_gki.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_gki.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_gki.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_gki.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_gki.c b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_gki.c
+new file mode 100644
+index 000000000..7f6333d91
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_gki.c
 @@ -0,0 +1,408 @@
 +#include <linux/version.h>
 +#ifdef ANDROID_PLATFORM
@@ -55202,9 +55467,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +}
 +
 +#endif
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_gki.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_gki.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_gki.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_gki.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_gki.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_gki.h
+new file mode 100644
+index 000000000..a41f57832
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_gki.h
 @@ -0,0 +1,72 @@
 +#ifndef __RWNX_GKI_H
 +#define __RWNX_GKI_H
@@ -55278,9 +55545,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +#endif
 +
 +#endif
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_irqs.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_irqs.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_irqs.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_irqs.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_irqs.c b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_irqs.c
+new file mode 100644
+index 000000000..8ba95b703
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_irqs.c
 @@ -0,0 +1,65 @@
 +/**
 + ******************************************************************************
@@ -55347,9 +55616,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +	enable_irq(rwnx_platform_get_irq(rwnx_plat));
 +#endif
 +}
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_irqs.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_irqs.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_irqs.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_irqs.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_irqs.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_irqs.h
+new file mode 100644
+index 000000000..d3fb4519c
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_irqs.h
 @@ -0,0 +1,20 @@
 +/**
 + ******************************************************************************
@@ -55371,9 +55642,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +void rwnx_task(unsigned long data);
 +
 +#endif /* _RWNX_IRQS_H_ */
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_main.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_main.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_main.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_main.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_main.c b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_main.c
+new file mode 100644
+index 000000000..e1a2eb55a
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_main.c
 @@ -0,0 +1,7391 @@
 +/**
 + ******************************************************************************
@@ -58904,7 +59177,7 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +	if (rwnx_vif == rwnx_hw->p2p_dev_vif) {
 +		rwnx_hw->is_p2p_alive = 0;
 +		if (timer_pending(&rwnx_hw->p2p_alive_timer)) {
-+			del_timer_sync(&rwnx_hw->p2p_alive_timer);
++			timer_delete_sync(&rwnx_hw->p2p_alive_timer);
 +		}
 +
 +		if (rwnx_vif->up) {
@@ -62626,7 +62899,7 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +		list_for_each_entry(defrag_ctrl, &rwnx_hw->defrag_list, list) {
 +			list_del_init(&defrag_ctrl->list);
 +			if (timer_pending(&defrag_ctrl->defrag_timer))
-+				del_timer_sync(&defrag_ctrl->defrag_timer);
++				timer_delete_sync(&defrag_ctrl->defrag_timer);
 +			dev_kfree_skb(defrag_ctrl->skb);
 +			kfree(defrag_ctrl);
 +		}
@@ -62752,8 +63025,8 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +}
 +
 +
-+#if MODULE_IMPORT_NS
-+MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
++MODULE_IMPORT_NS("VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver");
 +#endif
 +
 +module_init(rwnx_mod_init);
@@ -62766,9 +63039,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +MODULE_AUTHOR(RW_DRV_COPYRIGHT " " RW_DRV_AUTHOR);
 +MODULE_LICENSE("GPL");
 +
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_main.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_main.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_main.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_main.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_main.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_main.h
+new file mode 100644
+index 000000000..684ab081f
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_main.h
 @@ -0,0 +1,40 @@
 +/**
 + ******************************************************************************
@@ -62810,9 +63085,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +#define IS_CHIP_ID_H()  ((chip_id & CHIP_ID_H_MASK) == CHIP_ID_H_MASK)
 +
 +#endif /* _RWNX_MAIN_H_ */
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_mesh.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_mesh.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_mesh.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_mesh.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_mesh.c b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_mesh.c
+new file mode 100644
+index 000000000..8773db61a
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_mesh.c
 @@ -0,0 +1,42 @@
 +/**
 + ****************************************************************************************
@@ -62856,9 +63133,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +	/* Return the found information */
 +	return p_mesh_proxy;
 +}
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_mesh.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_mesh.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_mesh.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_mesh.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_mesh.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_mesh.h
+new file mode 100644
+index 000000000..db8950f16
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_mesh.h
 @@ -0,0 +1,45 @@
 +/**
 + ****************************************************************************************
@@ -62905,9 +63184,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +struct rwnx_mesh_proxy *rwnx_get_mesh_proxy_info(struct rwnx_vif *p_rwnx_vif, u8 *p_sta_addr, bool local);
 +
 +#endif /* _RWNX_MESH_H_ */
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_mod_params.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_mod_params.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_mod_params.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_mod_params.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_mod_params.c b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_mod_params.c
+new file mode 100644
+index 000000000..4aa6eba9c
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_mod_params.c
 @@ -0,0 +1,1754 @@
 +/**
 +******************************************************************************
@@ -64663,9 +64944,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +#endif
 +
 +}
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_mod_params.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_mod_params.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_mod_params.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_mod_params.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_mod_params.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_mod_params.h
+new file mode 100644
+index 000000000..fb407746d
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_mod_params.h
 @@ -0,0 +1,70 @@
 +/**
 + ******************************************************************************
@@ -64737,9 +65020,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +void rwnx_enable_mfp(struct rwnx_hw *rwnx_hw);
 +
 +#endif /* _RWNX_MOD_PARAM_H_ */
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_msg_rx.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_msg_rx.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_msg_rx.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_msg_rx.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_msg_rx.c b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_msg_rx.c
+new file mode 100644
+index 000000000..9eeccbd91
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_msg_rx.c
 @@ -0,0 +1,1567 @@
 +/**
 + ****************************************************************************************
@@ -66308,9 +66593,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +#endif
 +}
 +
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_msg_rx.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_msg_rx.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_msg_rx.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_msg_rx.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_msg_rx.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_msg_rx.h
+new file mode 100644
+index 000000000..b5556d160
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_msg_rx.h
 @@ -0,0 +1,19 @@
 +/**
 + ****************************************************************************************
@@ -66331,9 +66618,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +void rwnx_rx_handle_print(struct rwnx_hw *rwnx_hw, u8 *msg, u32 len);
 +
 +#endif /* _RWNX_MSG_RX_H_ */
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_msg_tx.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_msg_tx.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_msg_tx.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_msg_tx.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_msg_tx.c b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_msg_tx.c
+new file mode 100644
+index 000000000..0d5007a75
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_msg_tx.c
 @@ -0,0 +1,3677 @@
 +/**
 + ******************************************************************************
@@ -70012,9 +70301,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +	/* Send the MM_CFG_RSSI_REQ message to LMAC FW */
 +	return rwnx_send_msg(rwnx_hw, req, 1, MM_CFG_RSSI_CFM, NULL);
 +}
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_msg_tx.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_msg_tx.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_msg_tx.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_msg_tx.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_msg_tx.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_msg_tx.h
+new file mode 100644
+index 000000000..836f43b91
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_msg_tx.h
 @@ -0,0 +1,186 @@
 +/**
 + ****************************************************************************************
@@ -70202,9 +70493,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +#endif
 +
 +#endif /* _RWNX_MSG_TX_H_ */
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_mu_group.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_mu_group.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_mu_group.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_mu_group.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_mu_group.c b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_mu_group.c
+new file mode 100644
+index 000000000..538f14306
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_mu_group.c
 @@ -0,0 +1,659 @@
 +/**
 + ******************************************************************************
@@ -70865,9 +71158,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +		msecs_to_jiffies(RWNX_MU_GROUP_SELECT_INTERVAL);
 +	mu->next_group_select |= 1;
 +}
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_mu_group.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_mu_group.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_mu_group.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_mu_group.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_mu_group.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_mu_group.h
+new file mode 100644
+index 000000000..c24bb0396
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_mu_group.h
 @@ -0,0 +1,181 @@
 +/**
 + ******************************************************************************
@@ -71050,9 +71345,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +
 +#endif /* _RWNX_MU_GROUP_H_ */
 +
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_pci.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_pci.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_pci.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_pci.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_pci.c b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_pci.c
+new file mode 100644
+index 000000000..40dac9465
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_pci.c
 @@ -0,0 +1,94 @@
 +/**
 + ******************************************************************************
@@ -71148,9 +71445,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +	pci_unregister_driver(&rwnx_pci_drv);
 +}
 +
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_pci.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_pci.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_pci.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_pci.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_pci.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_pci.h
+new file mode 100644
+index 000000000..d81578cbe
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_pci.h
 @@ -0,0 +1,17 @@
 +/**
 + ******************************************************************************
@@ -71169,9 +71468,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +void rwnx_pci_unregister_drv(void);
 +
 +#endif /* _RWNX_PCI_H_ */
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_platform.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_platform.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_platform.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_platform.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_platform.c b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_platform.c
+new file mode 100644
+index 000000000..69331e78a
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_platform.c
 @@ -0,0 +1,2108 @@
 +/**
 + ******************************************************************************
@@ -71399,8 +71700,8 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +}
 +#endif
 +
-+#if MODULE_IMPORT_NS
-+MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
++MODULE_IMPORT_NS("VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver");
 +#endif
 +
 +#if 0
@@ -73281,9 +73582,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +#endif
 +
 +
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_platform.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_platform.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_platform.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_platform.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_platform.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_platform.h
+new file mode 100644
+index 000000000..79c91a072
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_platform.h
 @@ -0,0 +1,136 @@
 +/**
 + ******************************************************************************
@@ -73421,9 +73724,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +}
 +
 +#endif /* _RWNX_PLATFORM_H_ */
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_prof.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_prof.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_prof.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_prof.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_prof.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_prof.h
+new file mode 100644
+index 000000000..5442f5882
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_prof.h
 @@ -0,0 +1,133 @@
 +/**
 + ****************************************************************************************
@@ -73558,9 +73863,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +#endif
 +
 +#endif /* _RWNX_PROF_H_ */
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_radar.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_radar.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_radar.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_radar.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_radar.c b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_radar.c
+new file mode 100644
+index 000000000..c50f2d2b1
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_radar.c
 @@ -0,0 +1,1644 @@
 +/**
 +******************************************************************************
@@ -75206,9 +75513,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +
 +	return write;
 +}
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_radar.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_radar.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_radar.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_radar.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_radar.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_radar.h
+new file mode 100644
+index 000000000..8bc36f527
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_radar.h
 @@ -0,0 +1,160 @@
 +/**
 + ******************************************************************************
@@ -75370,9 +75679,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +#endif /* CONFIG_RWNX_RADAR */
 +
 +#endif // _RWNX_RADAR_H_
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_rx.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_rx.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_rx.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_rx.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_rx.c b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_rx.c
+new file mode 100644
+index 000000000..d740f146a
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_rx.c
 @@ -0,0 +1,2501 @@
 +/**
 + ******************************************************************************
@@ -76805,7 +77116,7 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +	preorder_ctrl->enable = false;
 +	spin_unlock_irqrestore(&preorder_ctrl->reord_list_lock, flags);
 +	if (timer_pending(&preorder_ctrl->reord_timer))
-+		ret = del_timer_sync(&preorder_ctrl->reord_timer);
++		ret = timer_delete_sync(&preorder_ctrl->reord_timer);
 +	cancel_work_sync(&preorder_ctrl->reord_timer_work);
 +
 +	return 0;
@@ -76836,7 +77147,7 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +		}
 +		spin_unlock_irqrestore(&preorder_ctrl->reord_list_lock, flags);
 +		if (timer_pending(&preorder_ctrl->reord_timer)) {
-+			ret = del_timer_sync(&preorder_ctrl->reord_timer);
++			ret = timer_delete_sync(&preorder_ctrl->reord_timer);
 +		}
 +		cancel_work_sync(&preorder_ctrl->reord_timer_work);
 +	}
@@ -77185,7 +77496,7 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +		}
 +	} else {
 +	if (timer_pending(&preorder_ctrl->reord_timer)) {
-+			ret = del_timer(&preorder_ctrl->reord_timer);
++			ret = timer_delete(&preorder_ctrl->reord_timer);
 +	}
 +	}
 +	
@@ -77739,7 +78050,7 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +							skb_tmp = defrag_info->skb;
 +							list_del_init(&defrag_info->list);
 +							if (timer_pending(&defrag_info->defrag_timer)) {
-+								ret = del_timer(&defrag_info->defrag_timer);
++								ret = timer_delete(&defrag_info->defrag_timer);
 +							}
 +							kfree(defrag_info);
 +							spin_unlock_bh(&rwnx_hw->defrag_lock);
@@ -77875,9 +78186,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +	return 0;
 +}
 +
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_rx.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_rx.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_rx.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_rx.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_rx.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_rx.h
+new file mode 100644
+index 000000000..366353503
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_rx.h
 @@ -0,0 +1,392 @@
 +/**
 + ******************************************************************************
@@ -78271,9 +78584,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +#endif
 +
 +#endif /* _RWNX_RX_H_ */
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_strs.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_strs.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_strs.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_strs.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_strs.c b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_strs.c
+new file mode 100644
+index 000000000..52ffbf64c
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_strs.c
 @@ -0,0 +1,266 @@
 +/**
 + ******************************************************************************
@@ -78541,9 +78856,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +	[TASK_MESH]  = rwnx_meshid2str,
 +#endif
 +};
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_strs.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_strs.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_strs.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_strs.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_strs.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_strs.h
+new file mode 100644
+index 000000000..7dc83aba8
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_strs.h
 @@ -0,0 +1,31 @@
 +/**
 + ****************************************************************************************
@@ -78576,9 +78893,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +#endif /* CONFIG_RWNX_FHOST */
 +
 +#endif /* _RWNX_STRS_H_ */
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_tdls.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_tdls.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_tdls.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_tdls.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_tdls.c b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_tdls.c
+new file mode 100644
+index 000000000..34196edac
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_tdls.c
 @@ -0,0 +1,785 @@
 +/**
 + ******************************************************************************
@@ -79365,9 +79684,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +	dev_kfree_skb(skb);
 +	return ret;
 +}
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_tdls.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_tdls.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_tdls.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_tdls.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_tdls.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_tdls.h
+new file mode 100644
+index 000000000..590b420f6
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_tdls.h
 @@ -0,0 +1,54 @@
 +/**
 + ******************************************************************************
@@ -79423,9 +79744,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +						 struct cfg80211_chan_def *chandef);
 +
 +#endif /* RWNX_TDLS_H_ */
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_testmode.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_testmode.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_testmode.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_testmode.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_testmode.c b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_testmode.c
+new file mode 100644
+index 000000000..ef97354d0
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_testmode.c
 @@ -0,0 +1,230 @@
 +/**
 + ****************************************************************************************
@@ -79657,9 +79980,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +	kfree_skb(skb);
 +	return -EMSGSIZE;
 +}
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_testmode.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_testmode.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_testmode.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_testmode.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_testmode.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_testmode.h
+new file mode 100644
+index 000000000..9d1bca47e
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_testmode.h
 @@ -0,0 +1,64 @@
 +/**
 + ****************************************************************************************
@@ -79725,9 +80050,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +int rwnx_testmode_reg_dbg(struct ieee80211_hw *hw, struct nlattr **tb);
 +
 +#endif /* RWNX_TESTMODE_H_ */
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_tx.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_tx.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_tx.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_tx.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_tx.c b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_tx.c
+new file mode 100644
+index 000000000..c15f3be6c
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_tx.c
 @@ -0,0 +1,1953 @@
 +/**
 + ******************************************************************************
@@ -81682,9 +82009,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +
 +	spin_unlock_bh(&rwnx_hw->tx_lock);
 +}
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_tx.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_tx.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_tx.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_tx.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_tx.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_tx.h
+new file mode 100644
+index 000000000..a4036dc0c
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_tx.h
 @@ -0,0 +1,188 @@
 +/**
 + ******************************************************************************
@@ -81874,9 +82203,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +void rwnx_tx_push(struct rwnx_hw *rwnx_hw, struct rwnx_txhdr *txhdr, int flags);
 +
 +#endif /* _RWNX_TX_H_ */
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_txq.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_txq.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_txq.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_txq.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_txq.c b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_txq.c
+new file mode 100644
+index 000000000..5468c3a5e
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_txq.c
 @@ -0,0 +1,1370 @@
 +/**
 + ******************************************************************************
@@ -83248,9 +83579,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +
 +	}
 +}
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_txq.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_txq.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_txq.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_txq.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_txq.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_txq.h
+new file mode 100644
+index 000000000..47de68f8b
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_txq.h
 @@ -0,0 +1,402 @@
 +/**
 + ****************************************************************************************
@@ -83654,9 +83987,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +void rwnx_hwq_process_all(struct rwnx_hw *rwnx_hw);
 +
 +#endif /* _RWNX_TXQ_H_ */
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_utils.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_utils.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_utils.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_utils.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_utils.c b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_utils.c
+new file mode 100644
+index 000000000..6b3c6f29b
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_utils.c
 @@ -0,0 +1,39 @@
 +/**
 + * rwnx_utils.c
@@ -83697,9 +84032,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +	return 0;
 +}
 +
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_utils.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_utils.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_utils.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_utils.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_utils.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_utils.h
+new file mode 100644
+index 000000000..f71a601c2
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_utils.h
 @@ -0,0 +1,133 @@
 +/**
 + * rwnx_ipc_utils.h
@@ -83834,9 +84171,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +
 +#endif /* CONFIG_RWNX_FULLMAC */
 +#endif /* _RWNX_IPC_UTILS_H_ */
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_v7.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_v7.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_v7.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_v7.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_v7.c b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_v7.c
+new file mode 100644
+index 000000000..72e3c850b
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_v7.c
 @@ -0,0 +1,195 @@
 +/**
 + ******************************************************************************
@@ -84033,9 +84372,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +	kfree(*rwnx_plat);
 +	return ret;
 +}
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_v7.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_v7.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_v7.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_v7.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_v7.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_v7.h
+new file mode 100644
+index 000000000..c2e39765a
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_v7.h
 @@ -0,0 +1,20 @@
 +/**
 + ******************************************************************************
@@ -84057,17 +84398,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +						  struct rwnx_plat **rwnx_plat);
 +
 +#endif /* _RWNX_V7_H_ */
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_version_gen.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_version_gen.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_version_gen.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_version_gen.h	2024-06-14 03:58:38.000000000 +0200
-@@ -0,0 +1,4 @@
-+#define RWNX_VERS_REV "241c091M (master)"
-+#define RWNX_VERS_MOD "6.4.3.0"
-+#define RWNX_VERS_BANNER "rwnx v6.4.3.0 - - 241c091M (master)"
-+#define RELEASE_DATE "2024_0327_3561b08f"
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_version.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_version.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_version.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_version.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_version.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_version.h
+new file mode 100644
+index 000000000..46ecb5de1
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_version.h
 @@ -0,0 +1,12 @@
 +#ifndef _RWNX_VERSION_H_
 +#define _RWNX_VERSION_H_
@@ -84081,9 +84416,21 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +}
 +
 +#endif /* _RWNX_VERSION_H_ */
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_wakelock.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_wakelock.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_wakelock.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_wakelock.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_version_gen.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_version_gen.h
+new file mode 100644
+index 000000000..ed5429ee9
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_version_gen.h
+@@ -0,0 +1,4 @@
++#define RWNX_VERS_REV "241c091M (master)"
++#define RWNX_VERS_MOD "6.4.3.0"
++#define RWNX_VERS_BANNER "rwnx v6.4.3.0 - - 241c091M (master)"
++#define RELEASE_DATE "2024_0327_3561b08f"
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_wakelock.c b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_wakelock.c
+new file mode 100644
+index 000000000..69bcf3f5d
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_wakelock.c
 @@ -0,0 +1,86 @@
 +#include <linux/kernel.h>
 +#include <linux/version.h>
@@ -84171,9 +84518,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +	rwnx_wakeup_deinit(rwnx_hw->ws_pwrctrl);
 +}
 +
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_wakelock.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_wakelock.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_wakelock.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_wakelock.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_wakelock.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_wakelock.h
+new file mode 100644
+index 000000000..9c9655a46
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/rwnx_wakelock.h
 @@ -0,0 +1,21 @@
 +#ifndef __RWNX_WAKELOCK_H
 +#define __RWNX_WAKELOCK_H
@@ -84196,9 +84545,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +void aicwf_wakeup_lock_deinit(struct rwnx_hw *rwnx_hw);
 +
 +#endif
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/sdio_host.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/sdio_host.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/sdio_host.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/sdio_host.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/sdio_host.c b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/sdio_host.c
+new file mode 100644
+index 000000000..f59409946
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/sdio_host.c
 @@ -0,0 +1,137 @@
 +/**
 + * sdio_host.c
@@ -84337,9 +84688,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +	return ret;
 +}
 +
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/sdio_host.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/sdio_host.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/sdio_host.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/sdio_host.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/sdio_host.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/sdio_host.h
+new file mode 100644
+index 000000000..670e9e086
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/sdio_host.h
 @@ -0,0 +1,41 @@
 +/**
 + * sdio_host.h
@@ -84382,9 +84735,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +extern int aicwf_rwnx_sdio_platform_init(struct aic_sdio_dev *sdiodev);
 +
 +#endif
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/usb_host.c linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/usb_host.c
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/usb_host.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/usb_host.c	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/usb_host.c b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/usb_host.c
+new file mode 100644
+index 000000000..c5c86d0de
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/usb_host.c
 @@ -0,0 +1,146 @@
 +/**
 + * usb_host.c
@@ -84532,9 +84887,11 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +	return ret;
 +}
 +
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/usb_host.h linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/usb_host.h
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/usb_host.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/usb_host.h	2024-06-14 03:58:38.000000000 +0200
+diff --git a/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/usb_host.h b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/usb_host.h
+new file mode 100644
+index 000000000..012b90c97
+--- /dev/null
++++ b/drivers/net/wireless/aic8800_sdio/aic8800_fdrv/usb_host.h
 @@ -0,0 +1,41 @@
 +/**
 + * usb_host.h
@@ -84577,150 +84934,6 @@ diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/ne
 +extern int aicwf_rwnx_usb_platform_init(struct aic_usb_dev *usbdev);
 +
 +#endif
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/.gitignore linux-6.9.4/drivers/net/wireless/aic8800_sdio/.gitignore
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/.gitignore	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/.gitignore	2024-06-14 03:58:38.000000000 +0200
-@@ -0,0 +1,5 @@
-+*.symvers
-+*.order
-+*.symvers.cmd
-+*.order.cmd
-+.tmp_versions/
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/Kconfig linux-6.9.4/drivers/net/wireless/aic8800_sdio/Kconfig
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/Kconfig	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/Kconfig	2024-06-14 03:58:38.000000000 +0200
-@@ -0,0 +1,18 @@
-+config AIC_WLAN_SUPPORT
-+	bool "AIC wireless Support"
-+	default n
-+	help
-+	  This is support for aic wireless chip.
-+
-+config AIC_FW_PATH
-+	depends on AIC_WLAN_SUPPORT
-+	string "Firmware & config file path"
-+	default "/vendor/etc/firmware"
-+	#default "/lib/firmware/aic8800_sdio"
-+	help
-+	  Path to the firmware & config file.
-+
-+if AIC_WLAN_SUPPORT
-+source "drivers/net/wireless/aic8800/aic8800_fdrv/Kconfig"
-+source "drivers/net/wireless/aic8800/aic8800_btlpm/Kconfig"
-+endif
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/aic8800_sdio/Makefile linux-6.9.4/drivers/net/wireless/aic8800_sdio/Makefile
---- linux-6.9.4/drivers/net/wireless/aic8800_sdio/Makefile	1970-01-01 01:00:00.000000000 +0100
-+++ linux-6.9.4/drivers/net/wireless/aic8800_sdio/Makefile	2024-06-14 03:58:38.000000000 +0200
-@@ -0,0 +1,91 @@
-+CONFIG_AIC8800_BTLPM_SUPPORT := m
-+CONFIG_AIC8800_WLAN_SUPPORT := m
-+CONFIG_AIC_WLAN_SUPPORT := m
-+
-+obj-$(CONFIG_AIC8800_BTLPM_SUPPORT) += aic8800_btlpm/
-+obj-$(CONFIG_AIC8800_WLAN_SUPPORT) += aic8800_fdrv/
-+obj-$(CONFIG_AIC_WLAN_SUPPORT) += aic8800_bsp/
-+
-+MAKEFLAGS +=-j$(shell nproc)
-+
-+########## config option ##########
-+export CONFIG_USE_FW_REQUEST = n
-+export CONFIG_PREALLOC_RX_SKB = n
-+export CONFIG_PREALLOC_TXQ = y
-+export CONFIG_OOB = n
-+export CONFIG_GPIO_WAKEUP = n
-+export CONFIG_RESV_MEM_SUPPORT = y
-+###################################
-+
-+########## Platform support list ##########
-+export CONFIG_PLATFORM_ROCKCHIP = n
-+export CONFIG_PLATFORM_ROCKCHIP2 = n
-+export CONFIG_PLATFORM_ALLWINNER = n
-+export CONFIG_PLATFORM_AMLOGIC = n
-+export CONFIG_PLATFORM_UBUNTU = y
-+
-+ifeq ($(CONFIG_PLATFORM_ROCKCHIP), y)
-+ARCH = arm64
-+KDIR = /home/yaya/E/Rockchip/3566/firefly/Android11.0/Firefly-RK356X_Android11.0_git_20210824/RK356X_Android11.0/kernel
-+CROSS_COMPILE = /home/yaya/E/Rockchip/3566/firefly/Android11.0/Firefly-RK356X_Android11.0_git_20210824/RK356X_Android11.0/prebuilts/gcc/linux-x86/aarch64/gcc-linaro-6.3.1-2017.05-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-
-+ccflags-y += -DANDROID_PLATFORM
-+ccflags-y += -DCONFIG_PLATFORM_ROCKCHIP
-+endif
-+
-+ifeq ($(CONFIG_PLATFORM_ROCKCHIP2), y)
-+KDIR := /home/yaya/E/Rockchip/3126/Android6/kernel
-+ARCH ?= arm
-+CROSS_COMPILE ?= /home/yaya/E/Rockchip/3288/Android5/rk3288_JHY/prebuilts/gcc/linux-x86/arm/arm-eabi-4.6/bin/arm-eabi-
-+ccflags-y += -DANDROID_PLATFORM
-+ccflags-y += -DCONFIG_PLATFORM_ROCKCHIP2
-+endif
-+
-+ifeq ($(CONFIG_PLATFORM_ALLWINNER), y)
-+KDIR  = /home/yaya/E/Allwinner/A133/Android10/linux-4.9
-+ARCH = arm64
-+CROSS_COMPILE = /home/yaya/E/Allwinner/r818/Android10/lichee/out/gcc-linaro-5.3.1-2016.05-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-
-+export CONFIG_SUPPORT_LPM = y
-+ccflags-y += -DANDROID_PLATFORM
-+endif
-+
-+ifeq ($(CONFIG_PLATFORM_AMLOGIC), y)
-+ARCH = arm
-+CROSS_COMPILE = /home/yaya/D/Workspace/CyberQuantum/JinHaoYue/amls905x3/SDK/20191101-0tt-asop/android9.0/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9/bin/arm-linux-androidkernel-
-+KDIR = /home/yaya/D/Workspace/CyberQuantum/JinHaoYue/amls905x3/SDK/20191101-0tt-asop/android9.0/out/target/product/u202/obj/KERNEL_OBJ/
-+ccflags-y += -DANDROID_PLATFORM
-+export CONFIG_SUPPORT_LPM = y
-+endif
-+
-+ifeq ($(CONFIG_PLATFORM_UBUNTU), y)
-+KDIR  = /lib/modules/$(shell uname -r)/build
-+PWD   = $(shell pwd)
-+KVER = $(shell uname -r)
-+MODDESTDIR = /lib/modules/$(KVER)/kernel/drivers/net/wireless/aic8800
-+ARCH = x86_64
-+CROSS_COMPILE ?=
-+endif
-+###########################################
-+
-+all: modules
-+modules:
-+	make -C $(KDIR) M=$(PWD) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) modules
-+
-+install:
-+	mkdir -p $(MODDESTDIR)
-+	install -p -m 644 aic8800_bsp/aic8800_bsp.ko  $(MODDESTDIR)/
-+	install -p -m 644 aic8800_fdrv/aic8800_fdrv.ko  $(MODDESTDIR)/
-+	install -p -m 644 aic8800_btlpm/aic8800_btlpm.ko  $(MODDESTDIR)/
-+	/sbin/depmod -a ${KVER}
-+
-+uninstall:
-+	rm -rfv $(MODDESTDIR)/aic8800_bsp.ko
-+	rm -rfv $(MODDESTDIR)/aic8800_fdrv.ko
-+	rm -rfv $(MODDESTDIR)/aic8800_btlpm.ko
-+	/sbin/depmod -a ${KVER}
-+
-+clean:
-+	cd aic8800_bsp/;make clean;cd ..
-+	cd aic8800_fdrv/;make clean;cd ..
-+	cd aic8800_btlpm/;make clean;cd ..
-+	rm -rf modules.order Module.symvers .modules.order.cmd .Module.symvers.cmd .tmp_versions/
-+
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/Kconfig linux-6.9.4/drivers/net/wireless/Kconfig
---- linux-6.9.4/drivers/net/wireless/Kconfig	2024-06-14 17:05:16.121340851 +0200
-+++ linux-6.9.4/drivers/net/wireless/Kconfig	2024-06-14 17:02:21.148011271 +0200
-@@ -37,6 +37,7 @@
- source "drivers/net/wireless/ti/Kconfig"
- source "drivers/net/wireless/zydas/Kconfig"
- source "drivers/net/wireless/quantenna/Kconfig"
-+source "drivers/net/wireless/aic8800_sdio/Kconfig"
- 
- source "drivers/net/wireless/virtual/Kconfig"
- 
-diff --speed-large-files --no-dereference --minimal -Naur linux-6.9.4/drivers/net/wireless/Makefile linux-6.9.4/drivers/net/wireless/Makefile
---- linux-6.9.4/drivers/net/wireless/Makefile	2024-06-14 17:05:16.121340851 +0200
-+++ linux-6.9.4/drivers/net/wireless/Makefile	2024-06-14 17:02:21.148011271 +0200
-@@ -22,5 +22,6 @@
- obj-$(CONFIG_WLAN_VENDOR_ST) += st/
- obj-$(CONFIG_WLAN_VENDOR_TI) += ti/
- obj-$(CONFIG_WLAN_VENDOR_ZYDAS) += zydas/
-+obj-$(CONFIG_AIC_SDIO_WLAN_SUPPORT) += aic8800_sdio/
- 
- obj-$(CONFIG_WLAN) += virtual/
+-- 
+2.49.0
+

@@ -1,18 +1,18 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: John Doe <john.doe@somewhere.on.planet>
-Date: Sat, 15 Mar 2025 17:18:05 -0300
-Subject: Patch sun55i-a527-radxa-a5e.dts Add gmac0/1 wifi
+Date: Fri, 18 Apr 2025 23:23:55 -0400
+Subject: Enable emac0/1 wifi leds radxa-a5e.dts
 
 Signed-off-by: John Doe <john.doe@somewhere.on.planet>
 ---
- arch/arm64/boot/dts/allwinner/sun55i-a527-radxa-a5e.dts | 99 ++++++++++
- 1 file changed, 99 insertions(+)
+ arch/arm64/boot/dts/allwinner/sun55i-a527-radxa-a5e.dts | 96 ++++++++++
+ 1 file changed, 96 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/allwinner/sun55i-a527-radxa-a5e.dts b/arch/arm64/boot/dts/allwinner/sun55i-a527-radxa-a5e.dts
-index 912e1bda974c..8cf16035796e 100644
+index 13e476c0c997..356dd118aee5 100644
 --- a/arch/arm64/boot/dts/allwinner/sun55i-a527-radxa-a5e.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun55i-a527-radxa-a5e.dts
-@@ -11,16 +11,38 @@ / {
+@@ -12,16 +12,37 @@ / {
  	model = "Radxa A5E";
  	compatible = "radxa,cubie-a5e", "allwinner,sun55i-a527";
  
@@ -20,9 +20,8 @@ index 912e1bda974c..8cf16035796e 100644
  		serial0 = &uart0;
 +		mmc0 = &mmc0;
 +		mmc1 = &mmc1;
-+		mmc2 = &mmc2;
-+		ethernet0 = &gmac0;
-+		ethernet1 = &gmac1;
++		ethernet0 = &emac0;
++		ethernet1 = &emac1;
 +		ethernet2 = &wlan;
  	};
  
@@ -51,7 +50,7 @@ index 912e1bda974c..8cf16035796e 100644
  		compatible = "fixed-clock";
  		clock-frequency = <32768>;
  		clock-output-names = "ext_osc32k";
-@@ -42,10 +64,20 @@ reg_usb_vbus: vbus {
+@@ -43,10 +64,20 @@ reg_usb_vbus: vbus {
  		regulator-max-microvolt = <5000000>;
  		vin-supply = <&reg_vcc5v>;
  		gpio = <&r_pio 0 8 GPIO_ACTIVE_HIGH>;	/* PL8 */
@@ -69,10 +68,10 @@ index 912e1bda974c..8cf16035796e 100644
 +	};
  };
  
- &ehci0 {
- 	status = "okay";
+ &cpu0 {
+ 	cpu-supply = <&reg_dcdc1>;
  };
-@@ -59,10 +91,27 @@ &mmc0 {
+@@ -68,10 +99,27 @@ &mmc0 {
  	cd-gpios = <&pio 5 6 (GPIO_ACTIVE_LOW | GPIO_PULL_DOWN)>; /* PF6 */
  	bus-width = <4>;
  	status = "okay";
@@ -100,60 +99,58 @@ index 912e1bda974c..8cf16035796e 100644
  };
  
  &ohci1 {
-@@ -295,5 +344,55 @@ &usb_otg {
+@@ -304,5 +352,53 @@ &usb_otg {
  &usbphy {
  	usb0_vbus-supply = <&reg_vcc5v>;
  	usb1_vbus-supply = <&reg_usb_vbus>;
  	status = "okay";
  };
 +
-+&gmac0 {
++&emac0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&emac0_pins>;
++
 +	phy-mode = "rgmii";
-+	pinctrl-names = "default", "sleep";
-+	pinctrl-0 = <&gmac0_pins_default>;
-+	pinctrl-1 = <&gmac0_pins_sleep>;
-+	sunxi,phy-clk-type = <0>;
-+	tx-delay = <2>;
-+	rx-delay = <4>;
-+	gmac3v3-supply = <&reg_cldo3>;
++	phy-handle = <&ext_rgmii_phy>;
++	phy-supply = <&reg_cldo3>;
++
++	allwinner,tx-delay-ps =  < 300 >;
++	allwinner,rx-delay-ps =  < 400 >;
++
 +	status = "okay";
 +};
 +
 +&mdio0 {
-+	compatible = "allwinner,sunxi-mdio";
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	reg = <0x04500048 0x8>;
-+	status = "okay";
-+
-+	gmac0_phy0: ethernet-phy@1 {
++	ext_rgmii_phy: ethernet-phy@1 {
 +		compatible = "ethernet-phy-ieee802.3-c22";
-+		reg = <0x1>;
-+		reset-gpios = <&pio 7 8 GPIO_ACTIVE_LOW>; /* PH8 */
-+		reset-assert-us = <10000>;
-+		reset-deassert-us = <150000>;
++		reg = <1>;
 +	};
 +};
 +
-+&gmac1 {
++&emac1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&emac1_pins>;
++	phy-handle = <&emac1_phy>;
 +	phy-mode = "rgmii";
-+	pinctrl-names = "default", "sleep";
-+	pinctrl-0 = <&gmac1_pins_default>;
-+	pinctrl-1 = <&gmac1_pins_sleep>;
 +	aw,soc-phy25m;
 +	tx-delay = <3>;
 +	rx-delay = <4>;
 +	dwmac3v3-supply = <&reg_cldo3>;
++	snps,reset-gpio = <&pio 9 16 GPIO_ACTIVE_LOW>;
++	snps,reset-delays-us = <0>, <10000>, <150000>;
++	snps,reset-active-low;
 +	status = "okay";
++};
 +
-+	mdio1: mdio1@1 {
-+		gmac1_phy0: ethernet-phy@1 {
-+			compatible = "ethernet-phy-ieee802.3-c22";
-+			reg = <0x1>;
-+			reset-gpios = <&pio 9 16 GPIO_ACTIVE_LOW>; /* PJ16 */
-+			reset-assert-us = <10000>;
-+			reset-deassert-us = <150000>;
-+		};
++&mdio1 {
++	emac1_phy: ethernet-phy@1 {
++		compatible = "ethernet-phy-ieee802.3-c22";
++		reg = <0x1>;
++		/* TODO: doesn't work?
++		reset-assert-us = <10000>;
++		reset-deassert-us = <150000>;
++		reset-gpios = <&pio 9 16 GPIO_ACTIVE_LOW>;
++		*/
 +	};
 +};
 -- 
