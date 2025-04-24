@@ -121,9 +121,9 @@ index e0abc6353..1a973312c 100644
  
 +&emac1 {
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&emac1_pins>;
++	pinctrl-0 = <&rgmii1_pins>;
 +	phy-handle = <&emac1_phy>;
-+	phy-mode = "rgmii";
++	phy-mode = "rgmii-id";
 +	aw,soc-phy25m;
 +	tx-delay = <2>;
 +	rx-delay = <5>;
