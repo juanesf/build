@@ -1,0 +1,74 @@
+Trying to use the SD card on the Radxa board revealed that the card
+detect wouldn't work as expected (insert not detected). Looking at the
+schematic shows that the pull-up resistor is actually not populated
+("NC"), and the transistor just pulls the GPIO pin to GND, but it's
+floating otherwise.
+So using the pull-down flag is definitely wrong, we need the internal
+pull up to get a reliable signal. The same is true for the Avaota board
+(there is no transistor there, but it's floating in the same way). There
+is no schematic for the X96QPro+ board, but experiments show it's the
+same behaviour.
+
+So change the GPIO flag for the card detect GPIO property to activate
+the pull-up resistor for that pin.
+
+Fixes: 80e0fb4e491b ("arm64: dts: allwinner: a523: add Radxa A5E support")
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+Hi,
+
+please let me know if I should split this up into 3 patches, with proper
+Fixes: tags, or if you can maybe squash this into the original commits
+still?
+
+Cheers,
+Andre
+
+ arch/arm64/boot/dts/allwinner/sun55i-a527-radxa-a5e.dts | 2 +-
+ arch/arm64/boot/dts/allwinner/sun55i-h728-x96qpro+.dts  | 2 +-
+ arch/arm64/boot/dts/allwinner/sun55i-t527-avaota-a1.dts | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/allwinner/sun55i-a527-radxa-a5e.dts b/arch/arm64/boot/dts/allwinner/sun55i-a527-radxa-a5e.dts
+index 03c9a9ef5adc2..2d2f3af91d05e 100644
+--- a/arch/arm64/boot/dts/allwinner/sun55i-a527-radxa-a5e.dts
++++ b/arch/arm64/boot/dts/allwinner/sun55i-a527-radxa-a5e.dts
+@@ -56,7 +56,7 @@ &ehci1 {
+ 
+ &mmc0 {
+ 	vmmc-supply = <&reg_cldo3>;
+-	cd-gpios = <&pio 5 6 (GPIO_ACTIVE_LOW | GPIO_PULL_DOWN)>; /* PF6 */
++	cd-gpios = <&pio 5 6 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>; /* PF6 */
+ 	bus-width = <4>;
+ 	status = "okay";
+ };
+diff --git a/arch/arm64/boot/dts/allwinner/sun55i-h728-x96qpro+.dts b/arch/arm64/boot/dts/allwinner/sun55i-h728-x96qpro+.dts
+index c0bce3f4fa925..59db103546f65 100644
+--- a/arch/arm64/boot/dts/allwinner/sun55i-h728-x96qpro+.dts
++++ b/arch/arm64/boot/dts/allwinner/sun55i-h728-x96qpro+.dts
+@@ -56,7 +56,7 @@ &ehci1 {
+ 
+ &mmc0 {
+ 	vmmc-supply = <&reg_vcc3v3>;
+-	cd-gpios = <&pio 5 6 (GPIO_ACTIVE_LOW | GPIO_PULL_DOWN)>; /* PF6 */
++	cd-gpios = <&pio 5 6 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>; /* PF6 */
+ 	bus-width = <4>;
+ 	disable-wp;
+ 	status = "okay";
+diff --git a/arch/arm64/boot/dts/allwinner/sun55i-t527-avaota-a1.dts b/arch/arm64/boot/dts/allwinner/sun55i-t527-avaota-a1.dts
+index 85a546aecdbe1..dea2acc1849bb 100644
+--- a/arch/arm64/boot/dts/allwinner/sun55i-t527-avaota-a1.dts
++++ b/arch/arm64/boot/dts/allwinner/sun55i-t527-avaota-a1.dts
+@@ -66,7 +66,7 @@ &ehci1 {
+ 
+ &mmc0 {
+ 	vmmc-supply = <&reg_cldo3>;
+-	cd-gpios = <&pio 5 6 (GPIO_ACTIVE_LOW | GPIO_PULL_DOWN)>; /* PF6 */
++	cd-gpios = <&pio 5 6 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>; /* PF6 */
+ 	bus-width = <4>;
+ 	status = "okay";
+ };
+
+base-commit: 1e5a69d67d1b3c55c9b0cd3933af1436b5d52aa1
+-- 
+2.46.3

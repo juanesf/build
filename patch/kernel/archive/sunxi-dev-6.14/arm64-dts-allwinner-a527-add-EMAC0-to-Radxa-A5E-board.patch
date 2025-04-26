@@ -1,0 +1,50 @@
+On Radxa A5E board, the EMAC0 connect to an external YT8531C PHY,
+which features a 25MHz crystal, and using PH8 pin as PHY reset.
+
+Tested on A5E board with schematic V1.20.
+
+Signed-off-by: Yixun Lan <dlan@gentoo.org>
+---
+ .../boot/dts/allwinner/sun55i-a527-radxa-a5e.dts      | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/allwinner/sun55i-a527-radxa-a5e.dts b/arch/arm64/boot/dts/allwinner/sun55i-a527-radxa-a5e.dts
+index 912e1bda974ce5f64c425e371357b1a78b7c13dd..4ba01ea6f0db793b08fb0645226126535d91c43b 100644
+--- a/arch/arm64/boot/dts/allwinner/sun55i-a527-radxa-a5e.dts
++++ b/arch/arm64/boot/dts/allwinner/sun55i-a527-radxa-a5e.dts
+@@ -12,6 +12,7 @@ / {
+ 	compatible = "radxa,cubie-a5e", "allwinner,sun55i-a527";
+ 
+ 	aliases {
++		ethernet0 = &emac0;
+ 		serial0 = &uart0;
+ 	};
+ 
+@@ -54,6 +55,24 @@ &ehci1 {
+ 	status = "okay";
+ };
+ 
++&emac0 {
++	phy-mode = "rgmii-id";
++	phy-handle = <&ext_rgmii_phy>;
++	phy-supply = <&reg_cldo3>;
++
++	allwinner,tx-delay-ps = <300>;
++	allwinner,rx-delay-ps = <400>;
++
++	status = "okay";
++};
++
++&mdio0 {
++	ext_rgmii_phy: ethernet-phy@1 {
++		compatible = "ethernet-phy-ieee802.3-c22";
++		reg = <1>;
++	};
++};
++
+ &mmc0 {
+ 	vmmc-supply = <&reg_cldo3>;
+ 	cd-gpios = <&pio 5 6 (GPIO_ACTIVE_LOW | GPIO_PULL_DOWN)>; /* PF6 */
+
+-- 
+2.49.0
