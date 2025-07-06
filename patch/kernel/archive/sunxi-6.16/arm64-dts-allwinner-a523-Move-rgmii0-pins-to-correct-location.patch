@@ -1,21 +1,20 @@
-From: Chen-Yu Tsai <wens@csie.org>
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Juan Sanchez <juanesf91@gmail.com>
+Date: Sat, 5 Jul 2025 22:23:56 -0400
+Subject: From: Chen-Yu Tsai <wens@csie.org>
 
-Nodes are supposed to be sorted by address, or if no addresses
-apply, by node name. The rgmii0 pins are out of order, possibly
-due to multiple patches adding pin mux settings conflicting.
-
-Move the rgmii0 pins to the correct location.
-
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Juan Sanchez <juanesf91@gmail.com>
 ---
- .../arm64/boot/dts/allwinner/sun55i-a523.dtsi | 20 +++++++++----------
+ arch/arm64/boot/dts/allwinner/sun55i-a523.dtsi | 20 +++++-----
  1 file changed, 10 insertions(+), 10 deletions(-)
 
 diff --git a/arch/arm64/boot/dts/allwinner/sun55i-a523.dtsi b/arch/arm64/boot/dts/allwinner/sun55i-a523.dtsi
-index 458d7ecedacd..30613a0b1124 100644
+index 53d68c069fd6..720580f9764c 100644
 --- a/arch/arm64/boot/dts/allwinner/sun55i-a523.dtsi
 +++ b/arch/arm64/boot/dts/allwinner/sun55i-a523.dtsi
-@@ -126,16 +126,6 @@ pio: pinctrl@2000000 {
+@@ -124,20 +124,10 @@ pio: pinctrl@2000000 {
+ 			gpio-controller;
+ 			#gpio-cells = <3>;
  			interrupt-controller;
  			#interrupt-cells = <3>;
  
@@ -32,7 +31,11 @@ index 458d7ecedacd..30613a0b1124 100644
  			mmc0_pins: mmc0-pins {
  				pins = "PF0" ,"PF1", "PF2", "PF3", "PF4", "PF5";
  				allwinner,pinmux = <2>;
-@@ -163,6 +153,16 @@ mmc2_pins: mmc2-pins {
+ 				function = "mmc0";
+ 				drive-strength = <30>;
+@@ -161,10 +151,20 @@ mmc2_pins: mmc2-pins {
+ 				function = "mmc2";
+ 				drive-strength = <30>;
  				bias-pull-up;
  			};
  
@@ -49,5 +52,8 @@ index 458d7ecedacd..30613a0b1124 100644
  			uart0_pb_pins: uart0-pb-pins {
  				pins = "PB9", "PB10";
  				allwinner,pinmux = <2>;
+ 				function = "uart0";
+ 			};
 -- 
-2.39.5
+Created with Armbian build tools https://github.com/armbian/build
+

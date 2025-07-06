@@ -1,24 +1,35 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Juan Sanchez <juanesf91@gmail.com>
-Date: Sat, 14 Jun 2025 19:51:56 -0400
-Subject: Add wifi (mmc1) with regulator to Raxda Cubie A5E
+Date: Fri, 4 Jul 2025 15:17:54 -0400
+Subject: Add wifi (mmc1) to Radxa Cubie A5E
 
 Signed-off-by: Juan Sanchez <juanesf91@gmail.com>
 ---
- arch/arm64/boot/dts/allwinner/sun55i-a527-cubie-a5e.dts | 27 ++++++++++
- 1 file changed, 27 insertions(+)
+ arch/arm64/boot/dts/allwinner/sun55i-a527-cubie-a5e.dts | 28 ++++++++++
+ 1 file changed, 28 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/allwinner/sun55i-a527-cubie-a5e.dts b/arch/arm64/boot/dts/allwinner/sun55i-a527-cubie-a5e.dts
-index 0f58d92a6adc..1e95de2db388 100644
+index 1c56306dffa1..d9bbfb916090 100644
 --- a/arch/arm64/boot/dts/allwinner/sun55i-a527-cubie-a5e.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun55i-a527-cubie-a5e.dts
-@@ -43,10 +43,20 @@ reg_usb_vbus: vbus {
- 		regulator-max-microvolt = <5000000>;
- 		vin-supply = <&reg_vcc5v>;
- 		gpio = <&r_pio 0 8 GPIO_ACTIVE_HIGH>;	/* PL8 */
- 		enable-active-high;
+@@ -11,10 +11,11 @@ / {
+ 	model = "Radxa Cubie A5E";
+ 	compatible = "radxa,cubie-a5e", "allwinner,sun55i-a527";
+ 
+ 	aliases {
+ 		ethernet0 = &emac0;
++		ethernet2 = &sdio_wifi;
+ 		serial0 = &uart0;
  	};
-+
+ 
+ 	chosen {
+ 		stdout-path = "serial0:115200n8";
+@@ -41,10 +42,20 @@ ext_osc32k: ext-osc32k-clk {
+ 		compatible = "fixed-clock";
+ 		clock-frequency = <32768>;
+ 		clock-output-names = "ext_osc32k";
+ 	};
+ 
 +	reg_3v3_wifi: 3v3-wifi {
 +		compatible = "regulator-fixed";
 +		regulator-name = "3v3-wifi";
@@ -28,12 +39,13 @@ index 0f58d92a6adc..1e95de2db388 100644
 +		gpio = <&r_pio 0 7 GPIO_ACTIVE_HIGH>; /* PL7 */
 +		enable-active-high;
 +	};
- };
- 
- &ehci0 {
- 	status = "okay";
- };
-@@ -78,10 +88,27 @@ &mmc0 {
++
+ 	reg_vcc5v: vcc5v {
+ 		/* board wide 5V supply from the USB-C connector */
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "vcc-5v";
+ 		regulator-min-microvolt = <5000000>;
+@@ -94,10 +105,27 @@ &mmc0 {
  	cd-gpios = <&pio 5 6 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>; /* PF6 */
  	bus-width = <4>;
  	status = "okay";

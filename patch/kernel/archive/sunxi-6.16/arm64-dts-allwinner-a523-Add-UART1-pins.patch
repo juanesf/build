@@ -6,13 +6,14 @@ WiFi+BT combo chip. The connection uses 4 pins.
 Add pinmux nodes for UART1, one for the RX/TX pins, and one for the
 RTS/CTS pins.
 
+Reviewed-by: Andre Przywara <andre.przywara@arm.com>
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
  arch/arm64/boot/dts/allwinner/sun55i-a523.dtsi | 14 ++++++++++++++
  1 file changed, 14 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/allwinner/sun55i-a523.dtsi b/arch/arm64/boot/dts/allwinner/sun55i-a523.dtsi
-index 30613a0b1124..6f62201fd739 100644
+index 4839411e51cf..cf0bc39aab04 100644
 --- a/arch/arm64/boot/dts/allwinner/sun55i-a523.dtsi
 +++ b/arch/arm64/boot/dts/allwinner/sun55i-a523.dtsi
 @@ -168,6 +168,20 @@ uart0_pb_pins: uart0-pb-pins {
