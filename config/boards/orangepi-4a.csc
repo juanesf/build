@@ -2,11 +2,11 @@
 BOARD_NAME="Orange Pi 4A"
 BOARDFAMILY="sun55iw3"
 BOARD_MAINTAINER=""
-BOOTCONFIG="sun55iw3p1_t527_defconfig" #fixme
-OVERLAY_PREFIX="sun55i-t527" #fixme
+BOOTCONFIG="orangepi-4a_defconfig"
+OVERLAY_PREFIX="sun55i-t527"
 #BOOT_LOGO="desktop"
 KERNEL_TARGET="dev,edge"
-BOOT_FDT_FILE="dtb/allwinner/sun55i-t527-orangepi-4a.dtb" #fixme
+BOOT_FDT_FILE="sun55i-t527-orangepi-4a.dtb"
 IMAGE_PARTITION_TABLE="gpt"
 #IMAGE_PARTITION_TABLE="msdos"
 BOOTFS_TYPE="fat"
