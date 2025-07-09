@@ -42,7 +42,7 @@ index 00000000000..062c3199c88
 +# CONFIG_AXP313A=y
 +# CONFIG_AXP313A_I2C_ADDR=0x6c
 +CONFIG_AXP_DCDC2_VOLT=920
-+CONFIG_AXP_DCDC3_VOLT=1100
++CONFIG_AXP_DCDC3_VOLT=600
 -- 
 Created with Armbian build tools https://github.com/armbian/build
 
