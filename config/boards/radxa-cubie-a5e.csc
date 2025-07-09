@@ -13,8 +13,8 @@ BOOTFS_TYPE="fat"
 BOOTSTART="1"
 BOOTSIZE="512"
 ROOTSTART="513"
-enable_extension "radxa-aic8800"
-AIC8800_TYPE="sdio"
+#enable_extension "radxa-aic8800"
+#AIC8800_TYPE="sdio"
 
 function post_family_tweaks__radxa_cubie-a5e() {
 	display_alert "Applying wifi firmware"
