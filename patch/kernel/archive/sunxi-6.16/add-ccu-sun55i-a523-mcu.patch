@@ -1,0 +1,163 @@
+diff --git a/drivers/clk/sunxi-ng/Kconfig b/drivers/clk/sunxi-ng/Kconfig
+index 8896fd052ef1..a7be1979ef20 100644
+--- a/drivers/clk/sunxi-ng/Kconfig
++++ b/drivers/clk/sunxi-ng/Kconfig
+@@ -62,6 +62,11 @@ config SUN55I_A523_R_CCU
+ 	default ARCH_SUNXI
+ 	depends on ARM64 || COMPILE_TEST
+ 
++config SUN55I_A523_MCU_CCU
++	tristate "Support for the Allwinner A523/T527 MCU CCU"
++	default y
++	depends on ARM64 || COMPILE_TEST
++
+ config SUN4I_A10_CCU
+ 	tristate "Support for the Allwinner A10/A20 CCU"
+ 	default ARCH_SUNXI
+diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
+index 82e471036de6..df41d7f5fb4e 100644
+--- a/drivers/clk/sunxi-ng/Makefile
++++ b/drivers/clk/sunxi-ng/Makefile
+@@ -35,6 +35,7 @@ obj-$(CONFIG_SUN50I_H6_R_CCU)	+= sun50i-h6-r-ccu.o
+ obj-$(CONFIG_SUN50I_H616_CCU)	+= sun50i-h616-ccu.o
+ obj-$(CONFIG_SUN55I_A523_CCU)	+= sun55i-a523-ccu.o
+ obj-$(CONFIG_SUN55I_A523_R_CCU)	+= sun55i-a523-r-ccu.o
++obj-$(CONFIG_SUN55I_A523_MCU_CCU)	+= ccu-sun55i-a523-mcu.o
+ obj-$(CONFIG_SUN4I_A10_CCU)	+= sun4i-a10-ccu.o
+ obj-$(CONFIG_SUN5I_CCU)		+= sun5i-ccu.o
+ obj-$(CONFIG_SUN6I_A31_CCU)	+= sun6i-a31-ccu.o
+diff --git a/drivers/clk/sunxi-ng/ccu-sun55i-a523.c b/drivers/clk/sunxi-ng/ccu-sun55i-a523.c
+index 9efb9fd24b42..f63b80fc4ee8 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun55i-a523.c
++++ b/drivers/clk/sunxi-ng/ccu-sun55i-a523.c
+@@ -167,6 +167,7 @@ static struct ccu_nkmp pll_gpu_clk = {
+ 	.n		= _SUNXI_CCU_MULT_MIN(8, 8, 11),
+ 	.m		= _SUNXI_CCU_DIV(1, 1), /* input divider */
+ 	.p		= _SUNXI_CCU_DIV(0, 1), /* output divider */
++	.max_rate	= 2520000000,
+ 	.common		= {
+ 		.reg		= 0x030,
+ 		.hw.init	= CLK_HW_INIT_PARENTS_DATA("pll-gpu", osc24M,
+@@ -248,6 +249,7 @@ static struct ccu_nkmp pll_ve_clk = {
+ 	.n		= _SUNXI_CCU_MULT_MIN(8, 8, 11),
+ 	.m		= _SUNXI_CCU_DIV(1, 1), /* input divider */
+ 	.p		= _SUNXI_CCU_DIV(0, 1), /* output divider */
++	.max_rate	= 2520000000,
+ 	.common		= {
+ 		.reg		= 0x058,
+ 		.hw.init	= CLK_HW_INIT_PARENTS_DATA("pll-ve", osc24M,
+@@ -321,6 +323,8 @@ static struct ccu_nm pll_npu_4x_clk = {
+ 	.lock		= BIT(28),
+ 	.n		= _SUNXI_CCU_MULT_MIN(8, 8, 11),
+ 	.m		= _SUNXI_CCU_DIV(1, 1),	/* input divider */
++	.min_rate = 1200000000,
++	.max_rate = 2520000000,
+ 	.common		= {
+ 		.reg		= 0x0080,
+ 		.hw.init	= CLK_HW_INIT_PARENTS_DATA("pll-npu-4x",
+@@ -385,7 +389,8 @@ static SUNXI_CCU_MP_DATA_WITH_MUX_GATE_FEAT(mbus_clk, "mbus", mbus_parents,
+ 					    0, 0,		/* no P */
+ 					    24, 3,	/* mux */
+ 					    BIT(31),	/* gate */
+-					    0, CCU_FEATURE_UPDATE_BIT);
++					    CLK_IS_CRITICAL,
++					    CCU_FEATURE_UPDATE_BIT);
+ 
+ static const struct clk_hw *mbus_hws[] = { &mbus_clk.common.hw };
+ 
+@@ -438,9 +443,9 @@ static SUNXI_CCU_M_HW_WITH_MUX_GATE(g2d_clk, "g2d", g2d_parents, 0x630,
+ 
+ static SUNXI_CCU_GATE_HWS(bus_g2d_clk, "bus-g2d", ahb_hws, 0x63c, BIT(0), 0);
+ 
++/* Delete the pll-periph0-800m. If GPU use pll-periph0-800m, gpu will occur job fault */
+ static const struct clk_hw *gpu_parents[] = {
+ 	&pll_gpu_clk.common.hw,
+-	&pll_periph0_800M_clk.common.hw,
+ 	&pll_periph0_600M_clk.hw,
+ 	&pll_periph0_400M_clk.hw,
+ 	&pll_periph0_300M_clk.hw,
+@@ -453,7 +458,7 @@ static SUNXI_CCU_M_HW_WITH_MUX_GATE(gpu_clk, "gpu", gpu_parents, 0x670,
+ 				    BIT(31),	/* gate */
+ 				    CLK_SET_RATE_PARENT);
+ 
+-static SUNXI_CCU_GATE_HWS(bus_gpu_clk, "bus-gpu", ahb_hws, 0x67c, BIT(0), 0);
++static SUNXI_CCU_GATE_HWS(bus_gpu_clk, "bus-gpu", ahb_hws, 0x67c, BIT(0), 0);
+ 
+ static const struct clk_parent_data ce_parents[] = {
+ 	{ .fw_name = "hosc" },
+@@ -1172,6 +1177,39 @@ static SUNXI_CCU_MUX_DATA_WITH_GATE(fanout2_clk, "fanout2", fanout_parents,
+ 				    BIT(23),	/* gate */
+ 				    0);
+ 
++static SUNXI_CCU_GATE(usb3_mbus_gate_clk, "usb3-mbus-gate",
++		"osc24M",
++		0x0804, BIT(6), 0);
++
++static SUNXI_CCU_GATE(usb2_ref_clk, "usb2_ref",
++		"osc24M",
++		0x0A80, BIT(31), 0);
++
++static const struct clk_parent_data usb3_ref_parents[] = { { .fw_name = "hosc" }, { .hw = &pll_periph0_200M_clk.hw }, { .hw = &pll_periph1_200M_clk.hw } };
++static SUNXI_CCU_M_DATA_WITH_MUX_GATE(usb3_ref_clk, "usb3-ref",
++		usb3_ref_parents, 0x0A84,
++		0, 5,	/* M */
++		24, 3,	/* mux */
++		BIT(31),	/* gate */
++		0);
++
++static const struct clk_parent_data usb3_suspend_parents[] = { { .fw_name = "losc" }, { .fw_name = "hosc" } };
++static SUNXI_CCU_M_DATA_WITH_MUX_GATE(usb3_suspend_clk, "usb3-suspend",
++		usb3_suspend_parents, 0x0A88,
++		0, 5,	/* M */
++		24, 1,	/* mux */
++		BIT(31),	/* gate */
++		0);
++
++static const struct clk_parent_data npu_parents[] = { { .hw = &pll_periph0_480M_clk.common.hw }, { .hw = &pll_periph0_600M_clk.hw }, { .hw = &pll_periph0_800M_clk.common.hw }, { .hw = &pll_npu_2x_clk.hw } };
++
++static SUNXI_CCU_M_DATA_WITH_MUX_GATE(npu_clk, "npu",
++		npu_parents, 0x06E0,
++		0, 5,	/* M */
++		24, 3,	/* mux */
++		BIT(31),	/* gate */
++		CLK_SET_RATE_PARENT);
++
+ /*
+  * Contains all clocks that are controlled by a hardware register. They
+  * have a (sunxi) .common member, which needs to be initialised by the common
+@@ -1339,6 +1377,11 @@ static struct ccu_common *sun55i_a523_ccu_clks[] = {
+ 	&fanout0_clk.common,
+ 	&fanout1_clk.common,
+ 	&fanout2_clk.common,
++	&npu_clk.common,
++	&usb3_mbus_gate_clk.common,
++	&usb3_ref_clk.common,
++	&usb2_ref_clk.common,
++	&usb3_suspend_clk.common,
+ };
+ 
+ static struct clk_hw_onecell_data sun55i_a523_hw_clks = {
+@@ -1523,6 +1566,11 @@ static struct clk_hw_onecell_data sun55i_a523_hw_clks = {
+ 		[CLK_FANOUT0]		= &fanout0_clk.common.hw,
+ 		[CLK_FANOUT1]		= &fanout1_clk.common.hw,
+ 		[CLK_FANOUT2]		= &fanout2_clk.common.hw,
++		[CLK_NPU]		= &npu_clk.common.hw,
++		[CLK_USB3_MBUS_GATE]	= &usb3_mbus_gate_clk.common.hw,
++		[CLK_USB3_REF]		= &usb3_ref_clk.common.hw,
++		[CLK_USB2_REF]		= &usb2_ref_clk.common.hw,
++		[CLK_USB3_SUSPEND]	= &usb3_suspend_clk.common.hw,
+ 	},
+ };
+ 
+diff --git a/drivers/clk/sunxi-ng/ccu-sun55i-a523.h b/drivers/clk/sunxi-ng/ccu-sun55i-a523.h
+index fc8dd42f1b47..174a7a6bd271 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun55i-a523.h
++++ b/drivers/clk/sunxi-ng/ccu-sun55i-a523.h
+@@ -9,6 +9,6 @@
+ #include <dt-bindings/clock/sun55i-a523-ccu.h>
+ #include <dt-bindings/reset/sun55i-a523-ccu.h>
+ 
+-#define CLK_NUMBER	(CLK_FANOUT2 + 1)
++#define CLK_NUMBER	(CLK_USB3_SUSPEND + 1)
+ 
+ #endif /* _CCU_SUN55I_A523_H */

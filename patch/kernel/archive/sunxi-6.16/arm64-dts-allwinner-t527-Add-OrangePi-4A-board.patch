@@ -52,7 +52,7 @@ new file mode 100644
 index 000000000000..ff2fd8e71e03
 --- /dev/null
 +++ b/arch/arm64/boot/dts/allwinner/sun55i-t527-orangepi-4a.dts
-@@ -0,0 +1,383 @@
+@@ -0,0 +1,384 @@
 +// SPDX-License-Identifier: (GPL-2.0-only OR MIT)
 +/*
 + * Copyright (C) 2025 Chen-Yu Tsai <wens@csie.org>
@@ -92,6 +92,7 @@ index 000000000000..ff2fd8e71e03
 +			function = LED_FUNCTION_STATUS;
 +			color = <LED_COLOR_ID_GREEN>;
 +			gpios = <&pio 3 20 GPIO_ACTIVE_HIGH>; /* PD20 */
++			linux,default-trigger = "heartbeat";
 +		};
 +	};
 +
