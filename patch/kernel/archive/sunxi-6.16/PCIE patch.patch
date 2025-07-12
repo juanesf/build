@@ -1276,7 +1276,7 @@ index 000000000000..4693cd26359c
 +	if (!IS_ERR(pci->pcie3v3)) {
 +		ret = regulator_set_voltage(pci->pcie3v3, 3300000, 3300000);
 +		if (ret)
-+			sunxi_warn(dev, "failed to set regulator voltage\n");
++			sunxi_warn(dev, "failed to set regulator voltage pcie3v3\n");
 +
 +		ret = regulator_enable(pci->pcie3v3);
 +		if (ret)
@@ -1286,7 +1286,7 @@ index 000000000000..4693cd26359c
 +	if (!IS_ERR(pci->pcie1v8)) {
 +		ret = regulator_set_voltage(pci->pcie1v8, 1800000, 1800000);
 +		if (ret)
-+			sunxi_warn(dev, "failed to set regulator voltage\n");
++			sunxi_warn(dev, "failed to set regulator voltage pcie1v8\n");
 +
 +		ret = regulator_enable(pci->pcie1v8);
 +		if (ret)
