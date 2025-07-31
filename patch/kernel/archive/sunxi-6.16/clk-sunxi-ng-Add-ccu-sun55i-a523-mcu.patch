@@ -1,0 +1,765 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Juan Sanchez <juanesf91@gmail.com>
+Date: Wed, 23 Jul 2025 17:23:47 -0400
+Subject: From @Marvin on radxa/discord Add ccu-sun55i-a523-mcu
+
+Signed-off-by: Juan Sanchez <juanesf91@gmail.com>
+---
+ drivers/clk/sunxi-ng/Kconfig               |   5 +
+ drivers/clk/sunxi-ng/Makefile              |   1 +
+ drivers/clk/sunxi-ng/ccu-sun55i-a523-mcu.c | 516 ++++++++++
+ drivers/clk/sunxi-ng/ccu-sun55i-a523-mcu.h |  15 +
+ drivers/clk/sunxi-ng/ccu-sun55i-a523.c     |  54 +-
+ drivers/clk/sunxi-ng/ccu-sun55i-a523.h     |   2 +-
+ 6 files changed, 590 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/clk/sunxi-ng/Kconfig b/drivers/clk/sunxi-ng/Kconfig
+index 8896fd052ef1..6af2d020e03e 100644
+--- a/drivers/clk/sunxi-ng/Kconfig
++++ b/drivers/clk/sunxi-ng/Kconfig
+@@ -55,10 +55,15 @@ config SUN50I_H6_R_CCU
+ config SUN55I_A523_CCU
+ 	tristate "Support for the Allwinner A523/T527 CCU"
+ 	default ARCH_SUNXI
+ 	depends on ARM64 || COMPILE_TEST
+ 
++config SUN55I_A523_MCU_CCU
++	tristate "Support for the Allwinner A523/T527 MCU CCU"
++	default ARCH_SUNXI
++	depends on ARM64 || COMPILE_TEST
++
+ config SUN55I_A523_R_CCU
+ 	tristate "Support for the Allwinner A523/T527 PRCM CCU"
+ 	default ARCH_SUNXI
+ 	depends on ARM64 || COMPILE_TEST
+ 
+diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
+index 82e471036de6..1eadff3d1279 100644
+--- a/drivers/clk/sunxi-ng/Makefile
++++ b/drivers/clk/sunxi-ng/Makefile
+@@ -32,10 +32,11 @@ obj-$(CONFIG_SUN50I_A100_CCU)	+= sun50i-a100-ccu.o
+ obj-$(CONFIG_SUN50I_A100_R_CCU)	+= sun50i-a100-r-ccu.o
+ obj-$(CONFIG_SUN50I_H6_CCU)	+= sun50i-h6-ccu.o
+ obj-$(CONFIG_SUN50I_H6_R_CCU)	+= sun50i-h6-r-ccu.o
+ obj-$(CONFIG_SUN50I_H616_CCU)	+= sun50i-h616-ccu.o
+ obj-$(CONFIG_SUN55I_A523_CCU)	+= sun55i-a523-ccu.o
++obj-$(CONFIG_SUN55I_A523_MCU_CCU)	+= ccu-sun55i-a523-mcu.o
+ obj-$(CONFIG_SUN55I_A523_R_CCU)	+= sun55i-a523-r-ccu.o
+ obj-$(CONFIG_SUN4I_A10_CCU)	+= sun4i-a10-ccu.o
+ obj-$(CONFIG_SUN5I_CCU)		+= sun5i-ccu.o
+ obj-$(CONFIG_SUN6I_A31_CCU)	+= sun6i-a31-ccu.o
+ obj-$(CONFIG_SUN6I_RTC_CCU)	+= sun6i-rtc-ccu.o
+diff --git a/drivers/clk/sunxi-ng/ccu-sun55i-a523-mcu.c b/drivers/clk/sunxi-ng/ccu-sun55i-a523-mcu.c
+new file mode 100644
+index 000000000000..b4f9bec9b0f7
+--- /dev/null
++++ b/drivers/clk/sunxi-ng/ccu-sun55i-a523-mcu.c
+@@ -0,0 +1,516 @@
++// SPDX-License-Identifier: GPL-3.0
++/* Copyright(c) 2020 - 2023 Allwinner Technology Co.,Ltd. All rights reserved. */
++/*
++ * Copyright (c) 2022 rengaomin@allwinnertech.com
++ */
++
++#include <linux/clk-provider.h>
++#include <linux/module.h>
++#include <linux/of_address.h>
++#include <linux/platform_device.h>
++#include <linux/regmap.h>
++
++#include "ccu_common.h"
++#include "ccu_reset.h"
++
++#include "ccu_div.h"
++#include "ccu_gate.h"
++#include "ccu_mp.h"
++#include "ccu_nm.h"
++
++#include "ccu-sun55i-a523-mcu.h"
++
++/* ccu_des_start */
++
++#define SUN55IW3_PLL_AUDIO_CTRL_REG   0x000c
++static struct ccu_sdm_setting pll_audio1_sdm_table[] = {
++	{ .rate = 2167603200, .pattern = 0xA000A234, .m = 1, .n = 90 }, /* div2->22.5792 */
++	{ .rate = 2359296000, .pattern = 0xA0009BA6, .m = 1, .n = 98 }, /* div2->24.576 */
++	{ .rate = 1806336000, .pattern = 0xA000872B, .m = 1, .n = 75 }, /* div5->22.576 */
++};
++
++static struct ccu_nm pll_audio1_clk = {
++	.enable		= BIT(27) | BIT(29) | BIT(30) | BIT(31),
++	.lock		= BIT(28),
++	.n		= _SUNXI_CCU_MULT_MIN(8, 8, 12),
++	.m		= _SUNXI_CCU_DIV(1, 1), /* output divider */
++	.sdm		= _SUNXI_CCU_SDM(pll_audio1_sdm_table, BIT(24),
++			0x10, BIT(31)),
++	.common		= {
++		.reg		= 0x000C,
++		.features	= CCU_FEATURE_SIGMA_DELTA_MOD,
++		.hw.init	= CLK_HW_INIT("pll-audio1", "osc24M",
++					      &ccu_nm_ops,
++					      CLK_SET_RATE_UNGATE),
++	},
++};
++
++static CLK_FIXED_FACTOR_HW(pll_audio1_div2_clk, "pll-audio1-div2",
++		&pll_audio1_clk.common.hw,
++		2, 1, CLK_SET_RATE_PARENT);
++
++static CLK_FIXED_FACTOR_HW(pll_audio1_div5_clk, "pll-audio1-div5",
++		&pll_audio1_clk.common.hw,
++		5, 1, CLK_SET_RATE_PARENT);
++
++static SUNXI_CCU_M_WITH_GATE(pll_audio_out_clk, "pll-audio-out",
++				"pll-audio1-div2", 0x001C,
++				0, 5, BIT(31), 0);
++
++static const char * const dsp_parents[] = { "osc24M", "osc32k", "rc-16m", "pll-audio1-div5", "pll-audio1-div2", "dsp" };
++
++static SUNXI_CCU_M_WITH_MUX_GATE(dsp_dsp_clk, "dsp_dsp", dsp_parents, 0x0020,
++				  0, 5,
++				  24, 3,
++				  BIT(31), CLK_SET_RATE_NO_REPARENT);
++
++static const char * const i2s_parents[] = { "pll-audio0-4x", "pll-audio1-div2", "pll-audio1-div5" };
++
++static SUNXI_CCU_MP_WITH_MUX_GATE(i2s0_clk, "i2s0",
++					i2s_parents, 0x002C,
++					0, 5,	/* M */
++					5, 5,	/* N */
++					24, 3,	/* mux */
++					BIT(31), CLK_SET_RATE_NO_REPARENT | CLK_SET_RATE_PARENT);
++
++static SUNXI_CCU_MP_WITH_MUX_GATE(i2s1_clk, "i2s1",
++					i2s_parents, 0x0030,
++					0, 5,	/* M */
++					5, 5,	/* N */
++					24, 3,	/* mux */
++					BIT(31), CLK_SET_RATE_NO_REPARENT | CLK_SET_RATE_PARENT);
++
++static SUNXI_CCU_MP_WITH_MUX_GATE(i2s2_clk, "i2s2",
++					i2s_parents, 0x0034,
++					0, 5,	/* M */
++					5, 5,	/* N */
++					24, 3,	/* mux */
++					BIT(31), CLK_SET_RATE_NO_REPARENT | CLK_SET_RATE_PARENT);
++
++static SUNXI_CCU_MP_WITH_MUX_GATE(i2s3_clk, "i2s3",
++					i2s_parents, 0x0038,
++					0, 5,	/* M */
++					5, 5,	/* N */
++					24, 3,	/* mux */
++					BIT(31), CLK_SET_RATE_NO_REPARENT | CLK_SET_RATE_PARENT);
++
++static const char * const i2s3_asrc_parents[] = { "pll-periph1-300m", "pll-audio1-div2", "pll-audio1-div5" };
++
++static SUNXI_CCU_MP_WITH_MUX_GATE(i2s3_asrc_clk, "i2s3-asrc",
++					i2s3_asrc_parents, 0x003C,
++					0, 5,	/* M */
++					5, 5,	/* N */
++					24, 3,	/* mux */
++					BIT(31), CLK_SET_RATE_NO_REPARENT | CLK_SET_RATE_PARENT);
++
++static SUNXI_CCU_GATE(i2s0_bgr_clk, "i2s0-bgr",
++			"osc24M",
++			0x0040, BIT(0), 0);
++
++static SUNXI_CCU_GATE(i2s1_bgr_clk, "i2s1-bgr",
++			"osc24M",
++			0x0040, BIT(1), 0);
++
++static SUNXI_CCU_GATE(i2s2_bgr_clk, "i2s2-bgr",
++			"osc24M",
++			0x0040, BIT(2), 0);
++
++static SUNXI_CCU_GATE(i2s3_bgr_clk, "i2s3-bgr",
++			"osc24M",
++			0x0040, BIT(3), 0);
++
++static const char * const owa_tx_parents[] = { "pll-audio0-4x", "pll-audio1-div2", "pll-audio1-div5" };
++
++static SUNXI_CCU_MP_WITH_MUX_GATE(owa_tx_clk, "owa-tx",
++					owa_tx_parents, 0x0044,
++					0, 5,	/* M */
++					5, 5,	/* N */
++					24, 3,	/* mux */
++					BIT(31), CLK_SET_RATE_NO_REPARENT | CLK_SET_RATE_PARENT);
++
++static const char * const owa_rx_parents[] = { "pll-periph0-300m", "pll-audio1-div2", "pll-audio1-div5" };
++
++static SUNXI_CCU_MP_WITH_MUX_GATE(owa_rx_clk, "owa-rx",
++					owa_rx_parents, 0x0048,
++					0, 5,	/* M */
++					5, 5,	/* N */
++					24, 3,	/* mux */
++					BIT(31), CLK_SET_RATE_NO_REPARENT | CLK_SET_RATE_PARENT);
++
++static SUNXI_CCU_GATE(bus_owa_clk, "bus-owa",
++			"osc24M",
++			0x004C, BIT(0), 0);
++
++static const char * const dmic_parents[] = { "pll-audio0-4x", "pll-audio1-div2", "pll-audio1-div5" };
++
++static SUNXI_CCU_MP_WITH_MUX_GATE(dmic_clk, "dmic",
++					dmic_parents, 0x0050,
++					0, 5,	/* M */
++					5, 5,	/* N */
++					24, 3,	/* mux */
++					BIT(31), CLK_SET_RATE_NO_REPARENT | CLK_SET_RATE_PARENT);
++
++static SUNXI_CCU_GATE(dmic_bus_clk, "dmic-bus",
++			"osc24M",
++			0x0054, BIT(0), 0);
++
++static const char * const audio_codec_dac_parents[] = { "pll-audio0-4x", "pll-audio1-div2", "pll-audio1-div5" };
++
++static SUNXI_CCU_MP_WITH_MUX_GATE(audio_codec_dac_clk, "audio-codec-dac",
++					audio_codec_dac_parents, 0x0058,
++					0, 5,	/* M */
++					5, 5,	/* N */
++					24, 3,	/* mux */
++					BIT(31), CLK_SET_RATE_NO_REPARENT | CLK_SET_RATE_PARENT);
++
++static const char * const audio_codec_adc_parents[] = { "pll-audio0-4x", "pll-audio1-div2", "pll-audio1-div5" };
++
++static SUNXI_CCU_MP_WITH_MUX_GATE(audio_codec_adc_clk, "audio-codec-adc",
++					audio_codec_adc_parents, 0x005C,
++					0, 5,	/* M */
++					5, 5,	/* N */
++					24, 3,	/* mux */
++					BIT(31), CLK_SET_RATE_NO_REPARENT | CLK_SET_RATE_PARENT);
++
++static SUNXI_CCU_GATE(audio_codec_clk, "audio-codec",
++		"osc24M",
++		0x0060, BIT(0), 0);
++
++static SUNXI_CCU_GATE(dsp_msg_clk, "dsp-msg",
++		"osc24M",
++		0x0068, BIT(0), 0);
++
++static SUNXI_CCU_GATE(dsp_cfg_clk, "dsp-cfg",
++		"osc24M",
++		0x006C, BIT(0), 0);
++
++static SUNXI_CCU_GATE(npu_aclk, "npu-aclk",
++		"osc24M",
++		0x0070, BIT(2), 0);
++
++static SUNXI_CCU_GATE(npu_hclk, "npu-hclk",
++		"osc24M",
++		0x0070, BIT(1), 0);
++
++static const char * const mcu_timer_parents[] = { "osc24M", "rtc32k", "rc-16m", "r-ahb" };
++
++static struct ccu_div mcu_timer0_clk = {
++	.enable		= BIT(0),
++	.div		= _SUNXI_CCU_DIV_FLAGS(1, 3, CLK_DIVIDER_POWER_OF_TWO),
++	.mux		= _SUNXI_CCU_MUX(4, 2),
++	.common		= {
++		.reg		= 0x0074,
++		.hw.init	= CLK_HW_INIT_PARENTS("mcu-timer0", mcu_timer_parents, &ccu_div_ops, 0),
++	},
++};
++
++static struct ccu_div mcu_timer1_clk = {
++	.enable		= BIT(0),
++	.div		= _SUNXI_CCU_DIV_FLAGS(1, 3, CLK_DIVIDER_POWER_OF_TWO),
++	.mux		= _SUNXI_CCU_MUX(4, 2),
++	.common		= {
++		.reg		= 0x0078,
++		.hw.init	= CLK_HW_INIT_PARENTS("mcu-timer1", mcu_timer_parents, &ccu_div_ops, 0),
++	},
++};
++
++static struct ccu_div mcu_timer2_clk = {
++	.enable		= BIT(0),
++	.div		= _SUNXI_CCU_DIV_FLAGS(1, 3, CLK_DIVIDER_POWER_OF_TWO),
++	.mux		= _SUNXI_CCU_MUX(4, 2),
++	.common		= {
++		.reg		= 0x007C,
++		.hw.init	= CLK_HW_INIT_PARENTS("mcu-timer2", mcu_timer_parents, &ccu_div_ops, 0),
++	},
++};
++
++static struct ccu_div mcu_timer3_clk = {
++	.enable		= BIT(0),
++	.div		= _SUNXI_CCU_DIV_FLAGS(1, 3, CLK_DIVIDER_POWER_OF_TWO),
++	.mux		= _SUNXI_CCU_MUX(4, 2),
++	.common		= {
++		.reg		= 0x0080,
++		.hw.init	= CLK_HW_INIT_PARENTS("mcu-timer3", mcu_timer_parents, &ccu_div_ops, 0),
++	},
++};
++
++static struct ccu_div mcu_timer4_clk = {
++	.enable		= BIT(0),
++	.div		= _SUNXI_CCU_DIV_FLAGS(1, 3, CLK_DIVIDER_POWER_OF_TWO),
++	.mux		= _SUNXI_CCU_MUX(4, 2),
++	.common		= {
++		.reg		= 0x0084,
++		.hw.init	= CLK_HW_INIT_PARENTS("mcu-timer4", mcu_timer_parents, &ccu_div_ops, 0),
++	},
++};
++
++static struct ccu_div mcu_timer5_clk = {
++	.enable		= BIT(0),
++	.div		= _SUNXI_CCU_DIV_FLAGS(1, 3, CLK_DIVIDER_POWER_OF_TWO),
++	.mux		= _SUNXI_CCU_MUX(4, 2),
++	.common		= {
++		.reg		= 0x0088,
++		.hw.init	= CLK_HW_INIT_PARENTS("mcu-timer5", mcu_timer_parents, &ccu_div_ops, 0),
++	},
++};
++
++static SUNXI_CCU_GATE(bus_mcu_timer_clk, "bus-mcu-timer",
++		"osc24M",
++		0x008C, BIT(0), 0);
++
++static SUNXI_CCU_GATE(mcu_dma_clk, "mcu-dma",
++		"osc24M",
++		0x0104, BIT(0), 0);
++
++static SUNXI_CCU_GATE(tzma0_clk, "tzma0",
++		"osc24M",
++		0x0108, BIT(0), 0);
++
++static SUNXI_CCU_GATE(tzma1_clk, "tzma1",
++		"osc24M",
++		0x010C, BIT(0), 0);
++
++static SUNXI_CCU_GATE(pubsram_clk, "pubsram",
++		"osc24M",
++		0x0114, BIT(0), 0);
++
++static SUNXI_CCU_GATE(mcu_mclk, "mcu-mclk",
++		"osc24M",
++		0x011C, BIT(1), 0);
++
++static SUNXI_CCU_GATE(dma_mclk, "dma-mclk",
++		"osc24M",
++		0x011C, BIT(0), 0);
++
++static const char * const rv_parents[] = { "osc24M", "rtc-32k", "rc-16m" };
++
++static SUNXI_CCU_MUX_WITH_GATE(rv_clk, "rv",
++		rv_parents, 0x0120,
++		27, 3,	/* mux */
++		BIT(31), 0);
++
++static SUNXI_CCU_GATE(rv_cfg_clk, "rv-cfg",
++		"osc24M",
++		0x0124, BIT(0), 0);
++
++static SUNXI_CCU_GATE(riscv_msg_clk, "riscv-msg",
++		"osc24M",
++		0x0128, BIT(0), 0);
++
++static const char * const pwm_parents[] = { "osc24M", "rtc-32k", "rc-16m" };
++
++static SUNXI_CCU_MUX_WITH_GATE(mcu_pwm_clk, "mcu-pwm",
++		pwm_parents, 0x0130,
++		24, 3,	/* mux */
++		BIT(31), 0);
++
++static SUNXI_CCU_GATE(pwm_bgr_clk, "pwm-bgr",
++		"osc24M",
++		0x0134, BIT(0), 0);
++
++static SUNXI_CCU_GATE(ahb_auto_clk, "ahb-auto",
++		"osc24M",
++		0x013C, BIT(24), 0);
++/* ccu_des_end */
++
++/* rst_def_start */
++static struct ccu_reset_map sun55iw3_mcu_ccu_resets[] = {
++	[RST_BUS_MCU_I2S3]			= { 0x0040, BIT(19) },
++	[RST_BUS_MCU_I2S2]			= { 0x0040, BIT(18) },
++	[RST_BUS_MCU_I2S1]			= { 0x0040, BIT(17) },
++	[RST_BUS_MCU_I2S0]			= { 0x0040, BIT(16) },
++	[RST_BUS_MCU_OWA]			= { 0x004c, BIT(16) },
++	[RST_BUS_MCU_DMIC]			= { 0x0054, BIT(16) },
++	[RST_BUS_MCU_AUDIO_CODEC]		= { 0x0060, BIT(16) },
++	[RST_BUS_DSP_MSG]			= { 0x0068, BIT(16) },
++	[RST_BUS_DSP_CFG]			= { 0x006c, BIT(16) },
++	[RST_BUS_MCU_NPU]			= { 0x0070, BIT(16) },
++	[RST_BUS_MCU_TIME]			= { 0x008c, BIT(16) },
++	[RST_BUS_DSP]				= { 0x0100, BIT(17) },
++	[RST_BUS_DSP_DBG]			= { 0x0100, BIT(16) },
++	[RST_BUS_MCU_DMA]			= { 0x0104, BIT(16) },
++	[RST_BUS_PUBSRAM]			= { 0x0114, BIT(16) },
++	[RST_BUS_RV]				= { 0x0124, BIT(18) },
++	[RST_BUS_RV_DBG]			= { 0x0124, BIT(17) },
++	[RST_BUS_RV_CFG]			= { 0x0124, BIT(16) },
++	[RST_BUS_MCU_RV_MSG]			= { 0x0128, BIT(16) },
++	[RST_BUS_MCU_PWM]			= { 0x0134, BIT(16) },
++};
++/* rst_def_end */
++
++/* ccu_def_start */
++static struct clk_hw_onecell_data sun55iw3_mcu_hw_clks = {
++	.hws    = {
++		[CLK_PLL_MCU_AUDIO1]		= &pll_audio1_clk.common.hw,
++		[CLK_PLL_MCU_AUDIO1_DIV2]		= &pll_audio1_div2_clk.hw,
++		[CLK_PLL_MCU_AUDIO1_DIV5]		= &pll_audio1_div5_clk.hw,
++		[CLK_PLL_MCU_AUDIO_OUT]		= &pll_audio_out_clk.common.hw,
++		[CLK_DSP_DSP]			= &dsp_dsp_clk.common.hw,
++		[CLK_MCU_I2S0]			= &i2s0_clk.common.hw,
++		[CLK_MCU_I2S1]			= &i2s1_clk.common.hw,
++		[CLK_MCU_I2S2]			= &i2s2_clk.common.hw,
++		[CLK_MCU_I2S3]			= &i2s3_clk.common.hw,
++		[CLK_MCU_I2S3_ASRC]			= &i2s3_asrc_clk.common.hw,
++		[CLK_BUS_MCU_I2S0]			= &i2s0_bgr_clk.common.hw,
++		[CLK_BUS_MCU_I2S1]			= &i2s1_bgr_clk.common.hw,
++		[CLK_BUS_MCU_I2S2]			= &i2s2_bgr_clk.common.hw,
++		[CLK_BUS_MCU_I2S3]			= &i2s3_bgr_clk.common.hw,
++		[CLK_MCU_OWA_TX]			= &owa_tx_clk.common.hw,
++		[CLK_MCU_OWA_RX]			= &owa_rx_clk.common.hw,
++		[CLK_BUS_MCU_OWA]			= &bus_owa_clk.common.hw,
++		[CLK_MCU_DMIC]			= &dmic_clk.common.hw,
++		[CLK_BUS_MCU_DMIC]			= &dmic_bus_clk.common.hw,
++		[CLK_MCU_AUDIO_CODEC_DAC]		= &audio_codec_dac_clk.common.hw,
++		[CLK_MCU_AUDIO_CODEC_ADC]		= &audio_codec_adc_clk.common.hw,
++		[CLK_BUS_MCU_AUDIO_CODEC]		= &audio_codec_clk.common.hw,
++		[CLK_BUS_DSP_MSG]			= &dsp_msg_clk.common.hw,
++		[CLK_BUS_DSP_CFG]			= &dsp_cfg_clk.common.hw,
++		[CLK_BUS_MCU_NPU_ACLK]			= &npu_aclk.common.hw,
++		[CLK_BUS_MCU_NPU_HCLK]			= &npu_hclk.common.hw,
++		[CLK_MCU_TIMER0]			= &mcu_timer0_clk.common.hw,
++		[CLK_MCU_TIMER1]			= &mcu_timer1_clk.common.hw,
++		[CLK_MCU_TIMER2]			= &mcu_timer2_clk.common.hw,
++		[CLK_MCU_TIMER3]			= &mcu_timer3_clk.common.hw,
++		[CLK_MCU_TIMER4]			= &mcu_timer4_clk.common.hw,
++		[CLK_MCU_TIMER5]			= &mcu_timer5_clk.common.hw,
++		[CLK_BUS_MCU_TIMER]			= &bus_mcu_timer_clk.common.hw,
++		[CLK_BUS_MCU_DMA]			= &mcu_dma_clk.common.hw,
++		[CLK_BUS_MCU_TZMA0]			= &tzma0_clk.common.hw,
++		[CLK_BUS_MCU_TZMA1]			= &tzma1_clk.common.hw,
++		[CLK_BUS_PUBSRAM]			= &pubsram_clk.common.hw,
++		[CLK_BUS_MCU_MBUS]			= &mcu_mclk.common.hw,
++		[CLK_BUS_MCU_DMA_MBUS]			= &dma_mclk.common.hw,
++		[CLK_BUS_RV]			= &rv_clk.common.hw,
++		[CLK_BUS_RV_CFG]			= &rv_cfg_clk.common.hw,
++		[CLK_BUS_MCU_RISCV_MSG]			= &riscv_msg_clk.common.hw,
++		[CLK_MCU_PWM]			= &mcu_pwm_clk.common.hw,
++		[CLK_BUS_MCU_PWM]			= &pwm_bgr_clk.common.hw,
++		[CLK_BUS_MCU_AHB_AUTO]			= &ahb_auto_clk.common.hw,
++	},
++	.num = CLK_MCU_NUMBER,
++};
++/* ccu_def_end */
++
++static struct ccu_common *sun55iw3_mcu_ccu_clks[] = {
++	&pll_audio1_clk.common,
++	&pll_audio_out_clk.common,
++	&dsp_dsp_clk.common,
++	&i2s0_clk.common,
++	&i2s1_clk.common,
++	&i2s2_clk.common,
++	&i2s3_clk.common,
++	&i2s3_asrc_clk.common,
++	&i2s0_bgr_clk.common,
++	&i2s1_bgr_clk.common,
++	&i2s2_bgr_clk.common,
++	&i2s3_bgr_clk.common,
++	&owa_tx_clk.common,
++	&owa_rx_clk.common,
++	&bus_owa_clk.common,
++	&dmic_clk.common,
++	&dmic_bus_clk.common,
++	&audio_codec_dac_clk.common,
++	&audio_codec_adc_clk.common,
++	&audio_codec_clk.common,
++	&dsp_msg_clk.common,
++	&dsp_cfg_clk.common,
++	&npu_aclk.common,
++	&npu_hclk.common,
++	&mcu_timer0_clk.common,
++	&mcu_timer1_clk.common,
++	&mcu_timer2_clk.common,
++	&mcu_timer3_clk.common,
++	&mcu_timer4_clk.common,
++	&mcu_timer5_clk.common,
++	&bus_mcu_timer_clk.common,
++	&mcu_dma_clk.common,
++	&tzma0_clk.common,
++	&tzma1_clk.common,
++	&pubsram_clk.common,
++	&mcu_mclk.common,
++	&dma_mclk.common,
++	&rv_clk.common,
++	&rv_cfg_clk.common,
++	&riscv_msg_clk.common,
++	&mcu_pwm_clk.common,
++	&pwm_bgr_clk.common,
++	&ahb_auto_clk.common,
++};
++
++static const struct sunxi_ccu_desc sun55iw3_mcu_ccu_desc = {
++	.ccu_clks	= sun55iw3_mcu_ccu_clks,
++	.num_ccu_clks	= ARRAY_SIZE(sun55iw3_mcu_ccu_clks),
++
++	.hw_clks	= &sun55iw3_mcu_hw_clks,
++
++	.resets		= sun55iw3_mcu_ccu_resets,
++	.num_resets	= ARRAY_SIZE(sun55iw3_mcu_ccu_resets),
++};
++
++static int sun55iw3_mcu_ccu_probe(struct platform_device *pdev)
++{
++	void __iomem *reg;
++	u32 val;
++
++	reg = devm_platform_ioremap_resource(pdev, 0);
++	if (IS_ERR(reg))
++		return PTR_ERR(reg);
++
++	of_sunxi_ccu_probe(pdev->dev.of_node, reg, &sun55iw3_mcu_ccu_desc);
++
++	/* Keep off audio1 during startup */
++    	val = readl(reg + SUN55IW3_PLL_AUDIO_CTRL_REG);
++    	val &= ~BIT(30);
++    	writel(val, reg + SUN55IW3_PLL_AUDIO_CTRL_REG);
++
++	/* Enable audio PLL P0 to 2 */
++   	val = readl(reg + SUN55IW3_PLL_AUDIO_CTRL_REG);
++   	val &= ~GENMASK(18, 16);
++   	val |= (1 << 16);
++   	writel(val, reg + SUN55IW3_PLL_AUDIO_CTRL_REG);
++
++	/* Enable audio PLL P1 to 5 */
++    	val = readl(reg + SUN55IW3_PLL_AUDIO_CTRL_REG);
++    	val &= ~GENMASK(22, 20);
++    	val |= (4 << 20);
++    	writel(val, reg + SUN55IW3_PLL_AUDIO_CTRL_REG);
++
++	return 0;
++}
++
++static const struct of_device_id sun55iw3_mcu_ccu_ids[] = {
++	{ .compatible = "allwinner,sun55iw3-mcu-ccu" },
++	{ }
++};
++
++static struct platform_driver sun55iw3_mcu_ccu_driver = {
++	.probe	= sun55iw3_mcu_ccu_probe,
++	.driver	= {
++		.name	= "sun55iw3-mcu-ccu",
++		.of_match_table	= sun55iw3_mcu_ccu_ids,
++	},
++};
++
++static int __init sunxi_ccu_sun55iw3_mcu_init(void)
++{
++	int ret;
++
++	ret = platform_driver_register(&sun55iw3_mcu_ccu_driver);
++	if (ret)
++		pr_err("register ccu sun55iw3-mcu failed\n");
++
++	return ret;
++}
++core_initcall(sunxi_ccu_sun55iw3_mcu_init);
++
++static void __exit sunxi_ccu_sun55iw3_mcu_exit(void)
++{
++	return platform_driver_unregister(&sun55iw3_mcu_ccu_driver);
++}
++module_exit(sunxi_ccu_sun55iw3_mcu_exit);
++
++MODULE_DESCRIPTION("Allwinner sun55iw3-mcu clk driver");
++MODULE_LICENSE("GPL v2");
++MODULE_AUTHOR("rengaomin<rengaomin@allwinnertech.com>");
++MODULE_VERSION("1.1.2");
++
+diff --git a/drivers/clk/sunxi-ng/ccu-sun55i-a523-mcu.h b/drivers/clk/sunxi-ng/ccu-sun55i-a523-mcu.h
+new file mode 100644
+index 000000000000..3db83c38c18b
+--- /dev/null
++++ b/drivers/clk/sunxi-ng/ccu-sun55i-a523-mcu.h
+@@ -0,0 +1,15 @@
++
++/* SPDX-License-Identifier: GPL-2.0 */
++/* Copyright(c) 2020 - 2023 Allwinner Technology Co.,Ltd. All rights reserved. */
++/*
++ * Copyright (c) 2022 liujuan@allwinnertech.com
++ */
++
++#ifndef _CCU_SUN55IW3_MCU_H
++#define _CCU_SUN55IW3_MCU_H
++
++#include <dt-bindings/clock/sun55iw3-mcu-ccu.h>
++#include <dt-bindings/reset/sun55iw3-mcu-ccu.h>
++
++#endif /* _CCU_SUN55IW3_MCU_H */
++
+diff --git a/drivers/clk/sunxi-ng/ccu-sun55i-a523.c b/drivers/clk/sunxi-ng/ccu-sun55i-a523.c
+index 9efb9fd24b42..71c02c810041 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun55i-a523.c
++++ b/drivers/clk/sunxi-ng/ccu-sun55i-a523.c
+@@ -1,5 +1,6 @@
++
+ // SPDX-License-Identifier: GPL-2.0
+ /*
+  * Copyright (C) 2023-2024 Arm Ltd.
+  * Based on the D1 CCU driver:
+  *   Copyright (c) 2020 huangzhenwei@allwinnertech.com
+@@ -165,10 +166,11 @@ static struct ccu_nkmp pll_gpu_clk = {
+ 	.enable		= BIT(27),
+ 	.lock		= BIT(28),
+ 	.n		= _SUNXI_CCU_MULT_MIN(8, 8, 11),
+ 	.m		= _SUNXI_CCU_DIV(1, 1), /* input divider */
+ 	.p		= _SUNXI_CCU_DIV(0, 1), /* output divider */
++	.max_rate	= 2520000000,
+ 	.common		= {
+ 		.reg		= 0x030,
+ 		.hw.init	= CLK_HW_INIT_PARENTS_DATA("pll-gpu", osc24M,
+ 							   &ccu_nkmp_ops,
+ 							   CLK_SET_RATE_GATE),
+@@ -246,10 +248,11 @@ static struct ccu_nkmp pll_ve_clk = {
+ 	.enable		= BIT(27),
+ 	.lock		= BIT(28),
+ 	.n		= _SUNXI_CCU_MULT_MIN(8, 8, 11),
+ 	.m		= _SUNXI_CCU_DIV(1, 1), /* input divider */
+ 	.p		= _SUNXI_CCU_DIV(0, 1), /* output divider */
++	.max_rate	= 2520000000,
+ 	.common		= {
+ 		.reg		= 0x058,
+ 		.hw.init	= CLK_HW_INIT_PARENTS_DATA("pll-ve", osc24M,
+ 							   &ccu_nkmp_ops,
+ 							   CLK_SET_RATE_GATE),
+@@ -319,10 +322,12 @@ static CLK_FIXED_FACTOR_HW(pll_audio0_clk, "pll-audio0",
+ static struct ccu_nm pll_npu_4x_clk = {
+ 	.enable		= BIT(27),
+ 	.lock		= BIT(28),
+ 	.n		= _SUNXI_CCU_MULT_MIN(8, 8, 11),
+ 	.m		= _SUNXI_CCU_DIV(1, 1),	/* input divider */
++	.min_rate = 1200000000,
++	.max_rate = 2520000000,
+ 	.common		= {
+ 		.reg		= 0x0080,
+ 		.hw.init	= CLK_HW_INIT_PARENTS_DATA("pll-npu-4x",
+ 							   osc24M, &ccu_nm_ops,
+ 							   CLK_SET_RATE_GATE),
+@@ -383,11 +388,12 @@ static SUNXI_CCU_MP_DATA_WITH_MUX_GATE_FEAT(mbus_clk, "mbus", mbus_parents,
+ 					    0x540,
+ 					    0, 5,		/* M */
+ 					    0, 0,		/* no P */
+ 					    24, 3,	/* mux */
+ 					    BIT(31),	/* gate */
+-					    0, CCU_FEATURE_UPDATE_BIT);
++					    CLK_IS_CRITICAL,
++					    CCU_FEATURE_UPDATE_BIT);
+ 
+ static const struct clk_hw *mbus_hws[] = { &mbus_clk.common.hw };
+ 
+ /**************************************************************************
+  *                          mod clocks with gates                         *
+@@ -436,13 +442,14 @@ static SUNXI_CCU_M_HW_WITH_MUX_GATE(g2d_clk, "g2d", g2d_parents, 0x630,
+ 				    BIT(31),	/* gate */
+ 				    0);
+ 
+ static SUNXI_CCU_GATE_HWS(bus_g2d_clk, "bus-g2d", ahb_hws, 0x63c, BIT(0), 0);
+ 
++/* Delete the pll-periph0-800m. If GPU use pll-periph0-800m, gpu will occur job fault */
+ static const struct clk_hw *gpu_parents[] = {
+ 	&pll_gpu_clk.common.hw,
+-	&pll_periph0_800M_clk.common.hw,
++	/*&pll_periph0_800M_clk.common.hw,*/
+ 	&pll_periph0_600M_clk.hw,
+ 	&pll_periph0_400M_clk.hw,
+ 	&pll_periph0_300M_clk.hw,
+ 	&pll_periph0_200M_clk.hw,
+ };
+@@ -1170,10 +1177,43 @@ static SUNXI_CCU_MUX_DATA_WITH_GATE(fanout2_clk, "fanout2", fanout_parents,
+ 				    0xf3c,
+ 				    6, 3,	/* mux */
+ 				    BIT(23),	/* gate */
+ 				    0);
+ 
++static SUNXI_CCU_GATE(usb3_mbus_gate_clk, "usb3-mbus-gate",
++		"osc24M",
++		0x0804, BIT(6), 0);
++
++static SUNXI_CCU_GATE(usb2_ref_clk, "usb2_ref",
++		"osc24M",
++		0x0A80, BIT(31), 0);
++
++static const struct clk_parent_data usb3_ref_parents[] = { { .fw_name = "hosc" }, { .hw = &pll_periph0_200M_clk.hw }, { .hw = &pll_periph1_200M_clk.hw } };
++static SUNXI_CCU_M_DATA_WITH_MUX_GATE(usb3_ref_clk, "usb3-ref",
++		usb3_ref_parents, 0x0A84,
++		0, 5,		/* M */
++		24, 3,		/* mux */
++		BIT(31),	/* gate */
++		0);
++
++static const struct clk_parent_data usb3_suspend_parents[] = { { .fw_name = "losc" }, { .fw_name = "hosc" } };
++static SUNXI_CCU_M_DATA_WITH_MUX_GATE(usb3_suspend_clk, "usb3-suspend",
++		usb3_suspend_parents, 0x0A88,
++		0, 5,		/* M */
++		24, 1,		/* mux */
++		BIT(31),	/* gate */
++		0);
++
++static const struct clk_parent_data npu_parents[] = { { .hw = &pll_periph0_480M_clk.common.hw }, { .hw = &pll_periph0_600M_clk.hw }, { .hw = &pll_periph0_800M_clk.common.hw }, { .hw = &pll_npu_2x_clk.hw } };
++
++static SUNXI_CCU_M_DATA_WITH_MUX_GATE(npu_clk, "npu",
++		npu_parents, 0x06E0,
++		0, 5,		/* M */
++		24, 3,		/* mux */
++		BIT(31),	/* gate */
++		CLK_SET_RATE_PARENT);
++
+ /*
+  * Contains all clocks that are controlled by a hardware register. They
+  * have a (sunxi) .common member, which needs to be initialised by the common
+  * sunxi CCU code, to be filled with the MMIO base address and the shared lock.
+  */
+@@ -1337,10 +1377,15 @@ static struct ccu_common *sun55i_a523_ccu_clks[] = {
+ 	&fanout_27M_clk.common,
+ 	&fanout_pclk_clk.common,
+ 	&fanout0_clk.common,
+ 	&fanout1_clk.common,
+ 	&fanout2_clk.common,
++	&npu_clk.common,
++	&usb3_mbus_gate_clk.common,
++	&usb3_ref_clk.common,
++	&usb2_ref_clk.common,
++	&usb3_suspend_clk.common,
+ };
+ 
+ static struct clk_hw_onecell_data sun55i_a523_hw_clks = {
+ 	.num	= CLK_NUMBER,
+ 	.hws	= {
+@@ -1521,10 +1566,15 @@ static struct clk_hw_onecell_data sun55i_a523_hw_clks = {
+ 		[CLK_FANOUT_27M]	= &fanout_27M_clk.common.hw,
+ 		[CLK_FANOUT_PCLK]	= &fanout_pclk_clk.common.hw,
+ 		[CLK_FANOUT0]		= &fanout0_clk.common.hw,
+ 		[CLK_FANOUT1]		= &fanout1_clk.common.hw,
+ 		[CLK_FANOUT2]		= &fanout2_clk.common.hw,
++		[CLK_NPU]		= &npu_clk.common.hw,
++		[CLK_USB3_MBUS_GATE]	= &usb3_mbus_gate_clk.common.hw,
++		[CLK_USB3_REF]		= &usb3_ref_clk.common.hw,
++		[CLK_USB2_REF]		= &usb2_ref_clk.common.hw,
++		[CLK_USB3_SUSPEND]	= &usb3_suspend_clk.common.hw,
+ 	},
+ };
+ 
+ static struct ccu_reset_map sun55i_a523_ccu_resets[] = {
+ 	[RST_MBUS]		= { 0x540, BIT(30) },
+diff --git a/drivers/clk/sunxi-ng/ccu-sun55i-a523.h b/drivers/clk/sunxi-ng/ccu-sun55i-a523.h
+index fc8dd42f1b47..174a7a6bd271 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun55i-a523.h
++++ b/drivers/clk/sunxi-ng/ccu-sun55i-a523.h
+@@ -7,8 +7,8 @@
+ #define _CCU_SUN55I_A523_H
+ 
+ #include <dt-bindings/clock/sun55i-a523-ccu.h>
+ #include <dt-bindings/reset/sun55i-a523-ccu.h>
+ 
+-#define CLK_NUMBER	(CLK_FANOUT2 + 1)
++#define CLK_NUMBER	(CLK_USB3_SUSPEND + 1)
+ 
+ #endif /* _CCU_SUN55I_A523_H */
+-- 
+Created with Armbian build tools https://github.com/armbian/build
+

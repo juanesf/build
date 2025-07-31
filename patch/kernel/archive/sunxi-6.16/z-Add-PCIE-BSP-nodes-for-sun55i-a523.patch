@@ -1,9 +1,9 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
-From: John Doe <john.doe@somewhere.on.planet>
+From: Juan Sanchez <juanesf91@gmail.com>
 Date: Fri, 11 Jul 2025 15:48:41 -0400
 Subject: Add-PCIE-BSP-nodes-for-sun55i-a523
 
-Signed-off-by: John Doe <john.doe@somewhere.on.planet>
+Signed-off-by: Juan Sanchez <juanesf91@gmail.com>
 ---
  arch/arm64/boot/dts/allwinner/sun55i-a523.dtsi          |  99 ++++++++
  arch/arm64/boot/dts/allwinner/sun55i-a527-cubie-a5e.dts | 112 ++++++++++

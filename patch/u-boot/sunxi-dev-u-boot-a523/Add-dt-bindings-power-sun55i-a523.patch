@@ -1,0 +1,53 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Juan Sanchez <juanesf91@gmail.com>
+Date: Wed, 16 Jul 2025 02:51:21 -0400
+Subject: Add-dt-bindings-power-sun55i-a523
+
+Signed-off-by: Juan Sanchez <juanesf91@gmail.com>
+---
+ include/dt-bindings/power/allwinner,sun55i-a523-pck600.h | 15 ++++++++++
+ include/dt-bindings/power/allwinner,sun55i-a523-ppu.h    | 12 ++++++++
+ 2 files changed, 27 insertions(+)
+
+diff --git a/include/dt-bindings/power/allwinner,sun55i-a523-pck600.h b/include/dt-bindings/power/allwinner,sun55i-a523-pck600.h
+new file mode 100644
+index 00000000000..6b3d8ea7bb6
+--- /dev/null
++++ b/include/dt-bindings/power/allwinner,sun55i-a523-pck600.h
+@@ -0,0 +1,15 @@
++/* SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause) */
++
++#ifndef _DT_BINDINGS_POWER_SUN55I_A523_PCK600_H_
++#define _DT_BINDINGS_POWER_SUN55I_A523_PCK600_H_
++
++#define PD_VE			0
++#define PD_GPU			1
++#define PD_VI			2
++#define PD_VO0			3
++#define PD_VO1			4
++#define PD_DE			5
++#define PD_NAND			6
++#define PD_PCIE			7
++
++#endif /* _DT_BINDINGS_POWER_SUN55I_A523_PCK600_H_ */
+diff --git a/include/dt-bindings/power/allwinner,sun55i-a523-ppu.h b/include/dt-bindings/power/allwinner,sun55i-a523-ppu.h
+new file mode 100644
+index 00000000000..bc9aba73c19
+--- /dev/null
++++ b/include/dt-bindings/power/allwinner,sun55i-a523-ppu.h
+@@ -0,0 +1,12 @@
++/* SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause) */
++
++#ifndef _DT_BINDINGS_POWER_SUN55I_A523_PPU_H_
++#define _DT_BINDINGS_POWER_SUN55I_A523_PPU_H_
++
++#define PD_DSP			0
++#define PD_NPU			1
++#define PD_AUDIO		2
++#define PD_SRAM			3
++#define PD_RISCV		4
++
++#endif /* _DT_BINDINGS_POWER_SUN55I_A523_PPU_H_ */
+-- 
+Created with Armbian build tools https://github.com/armbian/build
+

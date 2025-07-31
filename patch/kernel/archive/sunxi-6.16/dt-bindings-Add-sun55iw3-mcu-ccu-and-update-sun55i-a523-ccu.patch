@@ -1,0 +1,151 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Juan Sanchez <juanesf91@gmail.com>
+Date: Wed, 23 Jul 2025 18:13:04 -0400
+Subject: From @Marvin on radxa/discord Add dt-bindings sun55iw3-mcu-ccu and
+ update sun55i-a523-ccu bindings
+
+Signed-off-by: Juan Sanchez <juanesf91@gmail.com>
+---
+ include/dt-bindings/clock/sun55i-a523-ccu.h  |  5 +
+ include/dt-bindings/clock/sun55iw3-mcu-ccu.h | 60 ++++++++++
+ include/dt-bindings/reset/sun55i-a523-ccu.h  |  1 +
+ include/dt-bindings/reset/sun55iw3-mcu-ccu.h | 32 +++++
+ 4 files changed, 98 insertions(+)
+
+diff --git a/include/dt-bindings/clock/sun55i-a523-ccu.h b/include/dt-bindings/clock/sun55i-a523-ccu.h
+index c8259ac5ada7..bec8865abf2c 100644
+--- a/include/dt-bindings/clock/sun55i-a523-ccu.h
++++ b/include/dt-bindings/clock/sun55i-a523-ccu.h
+@@ -183,7 +183,12 @@
+ #define CLK_FANOUT_27M		174
+ #define CLK_FANOUT_PCLK		175
+ #define CLK_FANOUT0		176
+ #define CLK_FANOUT1		177
+ #define CLK_FANOUT2		178
++#define CLK_NPU			179
++#define CLK_USB3_MBUS_GATE	180
++#define CLK_USB3_REF		181
++#define CLK_USB2_REF		182
++#define CLK_USB3_SUSPEND	183
+ 
+ #endif /* _DT_BINDINGS_CLK_SUN55I_A523_CCU_H_ */
+diff --git a/include/dt-bindings/clock/sun55iw3-mcu-ccu.h b/include/dt-bindings/clock/sun55iw3-mcu-ccu.h
+new file mode 100644
+index 000000000000..b2dbac987133
+--- /dev/null
++++ b/include/dt-bindings/clock/sun55iw3-mcu-ccu.h
+@@ -0,0 +1,60 @@
++
++/* SPDX-License-Identifier: GPL-2.0 */
++/* Copyright(c) 2020 - 2023 Allwinner Technology Co.,Ltd. All rights reserved. */
++/*
++ * Copyright (c) 2022 rengaomin@allwinnertech.com
++ */
++
++#ifndef _DT_BINDINGS_CLK_SUN55IW3_MCU_CCU_H_
++#define _DT_BINDINGS_CLK_SUN55IW3_MCU_CCU_H_
++
++#define CLK_PLL_MCU_AUDIO1	0
++#define CLK_PLL_MCU_AUDIO1_DIV2	1
++#define CLK_PLL_MCU_AUDIO1_DIV5	2
++#define CLK_PLL_MCU_AUDIO_OUT	3
++#define CLK_DSP_DSP		4
++#define CLK_MCU_I2S0		5
++#define CLK_MCU_I2S1		6
++#define CLK_MCU_I2S2		7
++#define CLK_MCU_I2S3		8
++#define CLK_MCU_I2S3_ASRC	9
++#define CLK_BUS_MCU_I2S0	10
++#define CLK_BUS_MCU_I2S1	11
++#define CLK_BUS_MCU_I2S2	12
++#define CLK_BUS_MCU_I2S3	13
++#define CLK_MCU_OWA_TX		14
++#define CLK_MCU_OWA_RX		15
++#define CLK_BUS_MCU_OWA		16
++#define CLK_MCU_DMIC		17
++#define CLK_BUS_MCU_DMIC	18
++#define CLK_MCU_AUDIO_CODEC_DAC	19
++#define CLK_MCU_AUDIO_CODEC_ADC	20
++#define CLK_BUS_MCU_AUDIO_CODEC	21
++#define CLK_BUS_DSP_MSG		22
++#define CLK_BUS_DSP_CFG		23
++#define CLK_BUS_MCU_NPU_ACLK	24
++#define CLK_BUS_MCU_NPU_HCLK	25
++#define CLK_MCU_TIMER0		27
++#define CLK_MCU_TIMER1		28
++#define CLK_MCU_TIMER2		29
++#define CLK_MCU_TIMER3		30
++#define CLK_MCU_TIMER4		31
++#define CLK_MCU_TIMER5		32
++#define CLK_BUS_MCU_TIMER	33
++#define CLK_BUS_MCU_DMA		34
++#define CLK_BUS_MCU_TZMA0	35
++#define CLK_BUS_MCU_TZMA1	36
++#define CLK_BUS_PUBSRAM		37
++#define CLK_BUS_MCU_MBUS	38
++#define CLK_BUS_MCU_DMA_MBUS	39
++#define CLK_BUS_RV		40
++#define CLK_BUS_RV_CFG		41
++#define CLK_BUS_MCU_RISCV_MSG	42
++#define CLK_MCU_PWM		43
++#define CLK_BUS_MCU_PWM		44
++#define CLK_BUS_MCU_AHB_AUTO	45
++
++#define CLK_MCU_NUMBER		(CLK_BUS_MCU_AHB_AUTO + 1)
++
++#endif /* _DT_BINDINGS_CLK_SUN55IW3_MCU_CCU_H_ */
++
+diff --git a/include/dt-bindings/reset/sun55i-a523-ccu.h b/include/dt-bindings/reset/sun55i-a523-ccu.h
+index 70df503f34fe..e5d788078ad3 100644
+--- a/include/dt-bindings/reset/sun55i-a523-ccu.h
++++ b/include/dt-bindings/reset/sun55i-a523-ccu.h
+@@ -82,7 +82,8 @@
+ #define RST_BUS_VIDEO_OUT0	73
+ #define RST_BUS_VIDEO_OUT1	74
+ #define RST_BUS_LEDC		75
+ #define RST_BUS_CSI		76
+ #define RST_BUS_ISP		77
++#define RST_BUS_USB_3		78
+ 
+ #endif /* _DT_BINDINGS_RST_SUN55I_A523_CCU_H_ */
+diff --git a/include/dt-bindings/reset/sun55iw3-mcu-ccu.h b/include/dt-bindings/reset/sun55iw3-mcu-ccu.h
+new file mode 100644
+index 000000000000..e64faed49f1c
+--- /dev/null
++++ b/include/dt-bindings/reset/sun55iw3-mcu-ccu.h
+@@ -0,0 +1,32 @@
++/* SPDX-License-Identifier: (GPL-2.0+ or MIT) */
++/* Copyright(c) 2020 - 2023 Allwinner Technology Co.,Ltd. All rights reserved. */
++/*
++ * Copyright (C) 2022 rengaomin@allwinnertech.com
++ */
++
++#ifndef _DT_BINDINGS_RST_SUN55IW3_MCU_CCU_H_
++#define _DT_BINDINGS_RST_SUN55IW3_MCU_CCU_H_
++
++#define RST_BUS_MCU_I2S3	0
++#define RST_BUS_MCU_I2S2	1
++#define RST_BUS_MCU_I2S1	2
++#define RST_BUS_MCU_I2S0	3
++#define RST_BUS_MCU_OWA		4
++#define RST_BUS_MCU_DMIC	5
++#define RST_BUS_MCU_AUDIO_CODEC	6
++#define RST_BUS_DSP_MSG		7
++#define RST_BUS_DSP_CFG		8
++#define RST_BUS_MCU_NPU		9
++#define RST_BUS_MCU_TIME	10
++#define RST_BUS_DSP		11
++#define RST_BUS_DSP_DBG		12
++#define RST_BUS_MCU_DMA		13
++#define RST_BUS_PUBSRAM		14
++#define RST_BUS_RV		15
++#define RST_BUS_RV_DBG		16
++#define RST_BUS_RV_CFG		17
++#define RST_BUS_MCU_RV_MSG	18
++#define RST_BUS_MCU_PWM		19
++
++#endif /* _DT_BINDINGS_RST_SUN55IW3_MCU_CCU_H_ */
++
+-- 
+Created with Armbian build tools https://github.com/armbian/build
+
