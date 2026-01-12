@@ -31,7 +31,7 @@ index a983f56b200a..b877d01e9139 100644
  	};
  
 +	reg_3v3_wifi: 3v3-wifi {
-+		compatible= "regulator-fixed";
++		compatible = "regulator-fixed";
 +		regulator-name = "3v3-wifi";
 +		regulator-min-microvolt = <3300000>;
 +		regulator-max-microvolt = <3300000>;
