@@ -1,0 +1,1320 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Juan Sanchez Fuentes <juanesf91@gmail.com>
+Date: Sun, 27 Jul 2025 00:00:00 -0400
+Subject: [PATCH] sunxi: add HiFi4 DSP boot driver for T527/A523
+
+Add U-Boot driver to boot the Xtensa HiFi4 DSP on Allwinner T527/A523
+SoCs. The driver configures clocks and resets via the MCU CCU, loads
+FreeRTOS firmware into DRAM, and releases the DSP from stall.
+
+Register definitions derived from the BSP kernel device tree
+(sun55i-t527.dtsi) and Linux MCU CCU driver (ccu-sun55i-a523-mcu.c).
+
+Key T527 differences from sun8iw20:
+- AArch64 with 64-bit physical addresses
+- DSP CFG registers at 0x07100000 (vs 0x01700000)
+- MCU CCU at 0x07102000 for clock gating and resets
+- SRAM remap flag at 0x07010364
+- No DRAM address remapping
+
+Signed-off-by: Juan Sanchez Fuentes <juanesf91@gmail.com>
+Assisted-by: opencode:deepseek-v4-flash-free
+---
+
+diff --git a/drivers/dsp/Kconfig b/drivers/dsp/Kconfig
+new file mode 100644
+index 00000000000..23c14ed5b64
+--- /dev/null
++++ b/drivers/dsp/Kconfig
+@@ -0,0 +1,4 @@
++config XTENSA_DSP
++	bool "Support Xtensa DSP"
++	depends on MACH_SUN55I_A523
++	default n
+diff --git a/drivers/dsp/Makefile b/drivers/dsp/Makefile
+new file mode 100644
+index 00000000000..c9e14f03f1e
+--- /dev/null
++++ b/drivers/dsp/Makefile
+@@ -0,0 +1,2 @@
++obj-$(CONFIG_MACH_SUN55I_A523) += sun55i/
++obj-y += common/
+diff --git a/drivers/dsp/common/Makefile b/drivers/dsp/common/Makefile
+new file mode 100644
+index 00000000000..7876a89d7d7
+--- /dev/null
++++ b/drivers/dsp/common/Makefile
+@@ -0,0 +1,2 @@
++obj-y += dsp_fdt.o
++obj-y += dsp_img.o
+diff --git a/drivers/dsp/common/dsp_fdt.c b/drivers/dsp/common/dsp_fdt.c
+new file mode 100644
+index 00000000000..12bcf0f64cf
+--- /dev/null
++++ b/drivers/dsp/common/dsp_fdt.c
+@@ -0,0 +1,311 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * drivers/dsp/common/dsp_fdt.c
++ *
++ * FDT parsing for HiFi4 DSP configuration.
++ * Adapted from Allwinner BSP to use mainline libfdt APIs.
++ */
++#include <log.h>
++#include <string.h>
++#include <fdt_support.h>
++#include <malloc.h>
++#include <asm/io.h>
++#include <linux/libfdt.h>
++
++#include "imgdts.h"
++#include "dsp_ic.h"
++#include "dsp_fdt.h"
++
++#define UART_NUM (6)
++
++struct dsp_pin_set {
++	u32 port;
++	u32 port_num;
++	u32 mul_sel;
++};
++
++static int match_compatible(const char *path,
++			    const char *compatible_str,
++			    int *nodeoffset)
++{
++	int nodeoff;
++	const char *pstr;
++
++	DSP_DEBUG("dsp:---- name [%s] msg -----\n", path);
++	nodeoff = fdt_path_offset(working_fdt, path);
++	if (nodeoff < 0) {
++		DSP_DEBUG("dsp:find [%s] node err\n", path);
++		return -1;
++	}
++
++	pstr = fdt_getprop(working_fdt, nodeoff, "compatible", NULL);
++	if (pstr) {
++		if (strcmp(pstr, compatible_str) == 0) {
++			*nodeoffset = nodeoff;
++			return 0;
++		}
++		DSP_DEBUG("dsp:expect compatible:[%s], but use compatible:[%s]\n",
++			  compatible_str, pstr);
++		return -1;
++	}
++
++	DSP_DEBUG("dsp:find compatible err\n");
++	return -1;
++}
++
++static int match_status(int nodeoffset)
++{
++	const char *string_val;
++
++	string_val = fdt_getprop(working_fdt, nodeoffset, "status", NULL);
++	if (string_val && strcmp("okay", string_val) == 0)
++		return 0;
++
++	return -1;
++}
++
++static int match_pinctrl_names(int nodeoffset)
++{
++	return fdt_stringlist_search(working_fdt, nodeoffset,
++				    "pinctrl-names", "default");
++}
++
++static int parse_pinctrl_pins(int nodeoffset, const char *propname,
++			      struct dsp_pin_set *pins, int max_pins)
++{
++	const u32 *prop;
++	int len, cells_per_pin, pin_count, i;
++
++	prop = fdt_getprop(working_fdt, nodeoffset, propname, &len);
++	if (!prop || len < 1)
++		return -1;
++
++	cells_per_pin = 5;
++	if ((len / 4) % cells_per_pin != 0)
++		cells_per_pin = len / 4 > 3 ? 5 : (len / 4);
++
++	pin_count = (len / 4) / cells_per_pin;
++	if (pin_count > max_pins)
++		pin_count = max_pins;
++
++	for (i = 0; i < pin_count; i++) {
++		pins[i].port = fdt32_to_cpu(prop[i * cells_per_pin + 0]);
++		pins[i].port_num = fdt32_to_cpu(prop[i * cells_per_pin + 1]);
++		pins[i].mul_sel = fdt32_to_cpu(prop[i * cells_per_pin + 2]);
++	}
++
++	return pin_count;
++}
++
++int dts_dsp_status(struct dts_msg_t *pmsg, u32 dsp_id)
++{
++	const char *compatible_str = DSP_STATUS_STR;
++	int nodeoff = 0;
++	int ret;
++	char str[20];
++
++	memset(str, 0, sizeof(str));
++	sprintf(str, "dsp%d", dsp_id);
++	ret = match_compatible(str, compatible_str, &nodeoff);
++	if (ret < 0) {
++		DSP_DEBUG("dsp%d:dts no config [%s]\n", dsp_id, str);
++		return -1;
++	}
++
++	DSP_DEBUG("dsp%d:dts can find config [%s]\n", dsp_id, str);
++
++	ret = match_status(nodeoff);
++	if (ret < 0) {
++		pmsg->dsp_status = DTS_CLOSE;
++		DSP_DEBUG("%s status is close\n", str);
++		return -1;
++	}
++	pmsg->dsp_status = DTS_OPEN;
++	return 0;
++}
++
++int dts_uart_msg(struct dts_msg_t *pmsg, u32 dsp_id)
++{
++	const char *compatible_str = DSP_UART_STR;
++	int i, nodeoff, ret, pin_count;
++	char str[20];
++	struct dsp_pin_set pin_set[32];
++
++	for (i = 0; i < UART_NUM; i++) {
++		memset(str, 0, sizeof(str));
++		sprintf(str, "serial%d", i);
++		ret = match_compatible(str, compatible_str, &nodeoff);
++		if (ret < 0)
++			continue;
++		DSP_DEBUG("dsp%d:dts can find config [%s]\n", dsp_id, str);
++		break;
++	}
++
++	if (i == UART_NUM) {
++		DSP_DEBUG("dsp%d:dts no config [%s]\n", dsp_id, str);
++		return -1;
++	}
++
++	pmsg->uart_msg.uart_port = i;
++	ret = match_status(nodeoff);
++	if (ret < 0) {
++		pmsg->uart_msg.status = DTS_CLOSE;
++		return -1;
++	}
++	pmsg->uart_msg.status = DTS_OPEN;
++
++	ret = match_pinctrl_names(nodeoff);
++	if (ret < 0)
++		return -1;
++
++	memset(str, 0, sizeof(str));
++	sprintf(str, "pinctrl-%d", ret);
++
++	pin_count = parse_pinctrl_pins(nodeoff, str, pin_set, 32);
++	if (pin_count < 2)
++		return -1;
++
++	for (i = 0; i < 2; i++) {
++		pmsg->uart_msg.uart_pin_msg[i].port = pin_set[i].port;
++		pmsg->uart_msg.uart_pin_msg[i].port_num = pin_set[i].port_num;
++		pmsg->uart_msg.uart_pin_msg[i].mul_sel = pin_set[i].mul_sel;
++	}
++
++	return 0;
++}
++
++#define GROUP_NUM (7)
++int dts_gpio_int_msg(struct dts_msg_t *pmsg, u32 dsp_id)
++{
++	const char *compatible_str = DSP_GPIO_INT_STR;
++	const char *group_str[GROUP_NUM] = {"PA", "PB", "PC", "PD", "PE", "PF", "PG"};
++	int nodeoff, ret;
++	unsigned int *pdata;
++	char str[20];
++	const char *pins;
++	int len;
++	int i, j;
++
++	memset(str, 0, sizeof(str));
++	sprintf(str, "dsp%d_gpio_int", dsp_id);
++	ret = match_compatible(str, compatible_str, &nodeoff);
++	if (ret < 0) {
++		DSP_DEBUG("dsp%d:dts no config [%s]\n", dsp_id, str);
++		return -1;
++	}
++
++	DSP_DEBUG("dsp%d:dts can find config [%s]\n", dsp_id, str);
++
++	ret = match_status(nodeoff);
++	if (ret < 0) {
++		memset((void *)&pmsg->gpio_int, 0, sizeof(struct dts_gpio_int_t));
++		return -1;
++	}
++
++	pins = fdt_getprop(working_fdt, nodeoff, "pin-group", &len);
++	if (!pins || len <= 0) {
++		memset((void *)&pmsg->gpio_int, 0, sizeof(struct dts_gpio_int_t));
++		return -1;
++	}
++
++	ret = len;
++	if (ret % 3 != 0) {
++		DSP_DEBUG("dsp%d:[%s] format err\n", dsp_id, str);
++		return -1;
++	}
++	ret /= 3;
++	pdata = &pmsg->gpio_int.gpio_a;
++	for (i = 0; i < ret; i++) {
++		memset(str, 0, sizeof(str));
++		memcpy(str, pins, 2);
++		DSP_DEBUG("[%d]%s\n", i, str);
++		for (j = 0; j < GROUP_NUM; j++) {
++			if (strcmp(str, group_str[j]) == 0) {
++				DSP_DEBUG("---%s ok\n", str);
++				pdata[j] = DTS_OPEN;
++			}
++		}
++		pins += 3;
++	}
++
++	return 0;
++}
++
++int dts_sharespace_msg(struct dts_msg_t *pmsg, u32 dsp_id)
++{
++	const char *compatible_str = DSP_SHARE_SPACE;
++	int i, nodeoff, ret;
++	char str[30];
++	const u32 *reg_data;
++	int len;
++
++	memset(str, 0, sizeof(str));
++	sprintf(str, "share_space%d", dsp_id);
++	ret = match_compatible(str, compatible_str, &nodeoff);
++	if (ret < 0) {
++		DSP_DEBUG("dsp%d:dts no config [%s]\n", dsp_id, str);
++		return -1;
++	}
++	DSP_DEBUG("dsp%d:dts can find config [%s]\n", dsp_id, str);
++
++	ret = match_status(nodeoff);
++	if (ret < 0) {
++		pmsg->dts_sharespace.status = DTS_CLOSE;
++		return -1;
++	}
++
++	pmsg->dts_sharespace.status = DTS_OPEN;
++
++	reg_data = fdt_getprop(working_fdt, nodeoff, "reg", &len);
++	if (!reg_data || len < 6 * sizeof(u32)) {
++		memset((void *)&pmsg->dts_sharespace, 0,
++		       sizeof(struct dts_sharespace_t));
++		return -1;
++	}
++
++	for (i = 0; i < 6; i++)
++		DSP_DEBUG("dsp%d:dts reg[%d]=0x%x\n", dsp_id, i,
++			  fdt32_to_cpu(reg_data[i]));
++
++	pmsg->dts_sharespace.dsp_write_addr = fdt32_to_cpu(reg_data[0]);
++	pmsg->dts_sharespace.dsp_write_size = fdt32_to_cpu(reg_data[1]);
++	pmsg->dts_sharespace.arm_write_addr = fdt32_to_cpu(reg_data[2]);
++	pmsg->dts_sharespace.arm_write_size = fdt32_to_cpu(reg_data[3]);
++	pmsg->dts_sharespace.dsp_log_addr = fdt32_to_cpu(reg_data[4]);
++	pmsg->dts_sharespace.dsp_log_size = fdt32_to_cpu(reg_data[5]);
++
++	return 0;
++}
++
++int dts_get_dsp_memory(ulong *start, u32 *size, u32 id)
++{
++	struct fdt_header *dtb_base = working_fdt;
++	int nodeoffset;
++	const u32 *reg_data;
++	int len;
++
++	if (id == 0) {
++		nodeoffset = fdt_path_offset(dtb_base, "/reserved-memory/dsp0");
++		if (nodeoffset < 0) {
++			pr_err("%s: no /reserved-memory/dsp0 in fdt\n", __func__);
++			return -1;
++		}
++	} else {
++		nodeoffset = fdt_path_offset(dtb_base, "/reserved-memory/dsp1");
++		if (nodeoffset < 0) {
++			pr_err("%s: no /reserved-memory/dsp1 in fdt\n", __func__);
++			return -1;
++		}
++	}
++
++	reg_data = fdt_getprop(dtb_base, nodeoffset, "reg", &len);
++	if (!reg_data || len < 4 * sizeof(u32)) {
++		pr_err("%s: error fdt get reg\n", __func__);
++		return -2;
++	}
++
++	*start = fdt32_to_cpu(reg_data[1]);
++	*size = fdt32_to_cpu(reg_data[3]);
++	DSP_DEBUG("start = 0x%lx size =0x%x\n", *start, *size);
++	return 0;
++}
+diff --git a/drivers/dsp/common/dsp_fdt.h b/drivers/dsp/common/dsp_fdt.h
+new file mode 100644
+index 00000000000..6831f8f91a6
+--- /dev/null
++++ b/drivers/dsp/common/dsp_fdt.h
+@@ -0,0 +1,19 @@
++/* SPDX-License-Identifier: GPL-2.0+ */
++/*
++ * drivers/dsp/common/dsp_fdt.h
++ *
++ * Copyright (c) 2007-2025 Allwinnertech Co., Ltd.
++ * Author: wujiayi <wujiayi@allwinnertech.com>
++ */
++
++#ifndef __DSP_FDT_H
++#define __DSP_FDT_H
++
++#include <fdt_support.h>
++#define DSP_DEBUG  printf
++int dts_uart_msg(struct dts_msg_t *pmsg, u32 dsp_id);
++int dts_dsp_status(struct dts_msg_t *pmsg, u32 dsp_id);
++int dts_gpio_int_msg(struct dts_msg_t *pmsg, u32 dsp_id);
++int dts_sharespace_msg(struct dts_msg_t *pmsg, u32 dsp_id);
++int dts_get_dsp_memory(ulong *start, u32 *size, u32 dsp_id);
++#endif
+diff --git a/drivers/dsp/common/dsp_ic.h b/drivers/dsp/common/dsp_ic.h
+new file mode 100644
+index 00000000000..8b643821640
+--- /dev/null
++++ b/drivers/dsp/common/dsp_ic.h
+@@ -0,0 +1,48 @@
++/* SPDX-License-Identifier: GPL-2.0+ */
++/*
++ * drivers/dsp/common/dsp_ic.h
++ *
++ * Copyright (c) 2007-2025 Allwinnertech Co., Ltd.
++ * Author: wujiayi <wujiayi@allwinnertech.com>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details
++ *
++ */
++
++#ifndef __DSP_IC_H
++#define __DSP_IC_H
++
++#if defined(CONFIG_MACH_SUN8IW20)
++#include "../sun8iw20/platform.h"
++#define ADDR_TPYE	u32
++#define DSP_STATUS_STR		"allwinner,sun8iw20p1-dsp"
++#define DSP_GPIO_INT_STR	"allwinner,sun8iw20p1-dsp-gpio-int"
++#define DSP_UART_STR		"allwinner,sun8iw20p1-dsp-uart"
++#define DSP_SHARE_SPACE		"allwinner,sun8iw20p1-dsp-share-space"
++#elif defined(CONFIG_MACH_SUN20IW1)
++#include "../sun8iw20/platform.h"
++#define ADDR_TPYE	u64
++#define DSP_STATUS_STR		"allwinner,sun20iw1-dsp"
++#define DSP_GPIO_INT_STR	"allwinner,sun20iw1-dsp-gpio-int"
++#define DSP_UART_STR		"allwinner,sun20iw1-dsp-uart"
++#define DSP_SHARE_SPACE		"allwinner,sun20iw1-dsp-share-space"
++#elif defined(CONFIG_MACH_SUN50IW11)
++#include "../sun50iw11/platform.h"
++#define ADDR_TPYE	u32
++#define DSP_UART_STR	"allwinner,sun50iw11-dsp-uart"
++#elif defined(CONFIG_MACH_SUN55I_A523)
++#include "../sun55i/platform.h"
++#define ADDR_TPYE	u64
++#define DSP_STATUS_STR		"allwinner,sun55i-a523-dsp"
++#define DSP_GPIO_INT_STR	"allwinner,sun55i-a523-dsp-gpio-int"
++#define DSP_UART_STR		"allwinner,sun55i-a523-dsp-uart"
++#define DSP_SHARE_SPACE		"allwinner,sun55i-a523-dsp-share-space"
++#endif
++#endif
+diff --git a/drivers/dsp/common/dsp_img.c b/drivers/dsp/common/dsp_img.c
+new file mode 100644
+index 00000000000..352834eb500
+--- /dev/null
++++ b/drivers/dsp/common/dsp_img.c
+@@ -0,0 +1,130 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * drivers/dsp/common/dsp_img.c
++ *
++ * Copyright (c) 2007-2025 Allwinnertech Co., Ltd.
++ * Author: wujiayi <wujiayi@allwinnertech.com>
++ */
++
++#include <asm/io.h>
++#include <log.h>
++#include <string.h>
++#include "elf.h"
++#include "imgdts.h"
++#include "dsp_img.h"
++#include "dsp_ic.h"
++#include "dsp_fdt.h"
++
++int show_img_version(char *head_addr, u32 dsp_id)
++{
++	printf("dsp%d version is %s\n", dsp_id, head_addr);
++	return 0;
++}
++
++int find_img_section(u32 img_addr, const char *section_name,
++		     unsigned long *section_addr)
++{
++	int i = 0;
++	unsigned char *strtab = NULL;
++	int ret = -1;
++
++	Elf32_Ehdr *ehdr = NULL;
++	Elf32_Shdr *shdr = NULL;
++
++	ehdr = (Elf32_Ehdr *)(ADDR_TPYE)img_addr;
++	shdr = (Elf32_Shdr *)(ADDR_TPYE)(img_addr + ehdr->e_shoff
++			+ (ehdr->e_shstrndx * sizeof(Elf32_Shdr)));
++
++	if (shdr->sh_type == SHT_STRTAB)
++		strtab = (unsigned char *)(ADDR_TPYE)(img_addr + shdr->sh_offset);
++
++	for (i = 0; i < ehdr->e_shnum; ++i) {
++		shdr = (Elf32_Shdr *)(ADDR_TPYE)(img_addr + ehdr->e_shoff
++				+ (i * sizeof(Elf32_Shdr)));
++
++		if (!(shdr->sh_flags & SHF_ALLOC)
++		    || (shdr->sh_addr == 0)
++		    || (shdr->sh_size == 0))
++			continue;
++
++		if (strtab) {
++			char *pstr = (char *)(&strtab[shdr->sh_name]);
++
++			if (strcmp(pstr, section_name) == 0) {
++				DSP_DEBUG("find dsp section: %s, addr = 0x%lx\n",
++					  pstr, (unsigned long)shdr->sh_addr);
++				*section_addr = shdr->sh_addr;
++				ret = 0;
++				break;
++			}
++		}
++	}
++
++	return ret;
++}
++
++int get_img_len(u32 img_addr, unsigned long section_addr, u32 *img_len)
++{
++	int ret = -1;
++	int i = 0;
++	struct spare_rtos_head_t *prtos = NULL;
++	Elf32_Ehdr *ehdr = NULL;
++	Elf32_Phdr *phdr = NULL;
++
++	ehdr = (Elf32_Ehdr *)(ADDR_TPYE)img_addr;
++	phdr = (Elf32_Phdr *)(ADDR_TPYE)(img_addr + ehdr->e_phoff);
++
++	for (i = 0; i < ehdr->e_phnum; ++i) {
++		if (section_addr == (unsigned long)phdr->p_paddr) {
++			prtos = (struct spare_rtos_head_t *)(ADDR_TPYE)(img_addr
++					+ phdr->p_offset);
++			*img_len = prtos->rtos_img_hdr.image_size;
++			ret = 0;
++			break;
++		}
++		++phdr;
++	}
++	return ret;
++}
++
++int set_msg_dts(u32 img_addr, unsigned long section_addr,
++		struct dts_msg_t *dts_msg)
++{
++	int ret = -1;
++	int i = 0;
++	struct spare_rtos_head_t *prtos = NULL;
++	Elf32_Ehdr *ehdr = NULL;
++	Elf32_Phdr *phdr = NULL;
++
++	ehdr = (Elf32_Ehdr *)(ADDR_TPYE)img_addr;
++	phdr = (Elf32_Phdr *)(ADDR_TPYE)(img_addr + ehdr->e_phoff);
++
++	for (i = 0; i < ehdr->e_phnum; ++i) {
++		if (section_addr == (unsigned long)phdr->p_paddr) {
++			prtos = (struct spare_rtos_head_t *)(ADDR_TPYE)(img_addr
++					+ phdr->p_offset);
++			memcpy((void *)&prtos->rtos_img_hdr.dts_msg,
++			       (void *)dts_msg, sizeof(struct dts_msg_t));
++			ret = 0;
++			break;
++		}
++		++phdr;
++	}
++	return ret;
++}
++
++unsigned long set_img_va_to_pa(unsigned long vaddr,
++			       struct vaddr_range_t *map, int size)
++{
++	unsigned long paddr = vaddr;
++	int i;
++
++	for (i = 0; i < size; i++) {
++		if (vaddr >= map[i].vstart && vaddr <= map[i].vend) {
++			paddr += map[i].offset;
++			break;
++		}
++	}
++
++	return paddr;
++}
+diff --git a/drivers/dsp/common/dsp_img.h b/drivers/dsp/common/dsp_img.h
+new file mode 100644
+index 00000000000..fc037dcacd2
+--- /dev/null
++++ b/drivers/dsp/common/dsp_img.h
+@@ -0,0 +1,27 @@
++/* SPDX-License-Identifier: GPL-2.0+ */
++/*
++ * drivers/dsp/common/dsp_img.h
++ *
++ * Copyright (c) 2007-2025 Allwinnertech Co., Ltd.
++ * Author: wujiayi <wujiayi@allwinnertech.com>
++ */
++
++#ifndef __DSP_IMG_H
++#define __DSP_IMG_H
++
++struct vaddr_range_t {
++	unsigned long vstart;
++	unsigned long vend;
++	unsigned long offset;
++};
++
++int show_img_version(char *head_addr, u32 dsp_id);
++int find_img_section(u32 img_addr, const char *section_name,
++		     unsigned long *section_addr);
++int get_img_len(u32 img_addr, unsigned long section_addr, u32 *img_len);
++int set_msg_dts(u32 img_addr, unsigned long section_addr,
++		struct dts_msg_t *dts_msg);
++unsigned long set_img_va_to_pa(unsigned long vaddr,
++			       struct vaddr_range_t *map, int size);
++
++#endif
+diff --git a/drivers/dsp/common/imgdts.h b/drivers/dsp/common/imgdts.h
+new file mode 100644
+index 00000000000..85978d06253
+--- /dev/null
++++ b/drivers/dsp/common/imgdts.h
+@@ -0,0 +1,54 @@
++/* SPDX-License-Identifier: GPL-2.0+ */
++/*
++ * drivers/dsp/common/imgdts.h
++ *
++ * Copyright (c) 2007-2025 Allwinnertech Co., Ltd.
++ * Author: wujiayi <wujiayi@allwinnertech.com>
++ */
++
++#ifndef __IMGDTS_H
++#define __IMGDTS_H
++
++#define DTS_CLOSE (0)
++#define DTS_OPEN  (1)
++
++struct dts_uart_pin_msg_t {
++	unsigned int port;
++	unsigned int port_num;
++	unsigned int mul_sel;
++};
++
++struct dts_uart_msg_t {
++	unsigned int status;
++	unsigned int uart_port;
++	struct dts_uart_pin_msg_t uart_pin_msg[2];
++};
++
++struct dts_gpio_int_t {
++	unsigned int gpio_a;
++	unsigned int gpio_b;
++	unsigned int gpio_c;
++	unsigned int gpio_d;
++	unsigned int gpio_e;
++	unsigned int gpio_f;
++	unsigned int gpio_g;
++};
++
++struct dts_sharespace_t {
++	unsigned int status;
++	unsigned int dsp_write_addr;
++	unsigned int dsp_write_size;
++	unsigned int arm_write_addr;
++	unsigned int arm_write_size;
++	unsigned int dsp_log_addr;
++	unsigned int dsp_log_size;
++};
++
++struct dts_msg_t {
++	unsigned int dsp_status;
++	struct dts_uart_msg_t uart_msg;
++	struct dts_gpio_int_t gpio_int;
++	struct dts_sharespace_t dts_sharespace;
++};
++
++#endif
+diff --git a/drivers/dsp/sun55i/Makefile b/drivers/dsp/sun55i/Makefile
+new file mode 100644
+index 00000000000..5752c86cbfb
+--- /dev/null
++++ b/drivers/dsp/sun55i/Makefile
+@@ -0,0 +1 @@
++obj-y += dsp.o
+diff --git a/drivers/dsp/sun55i/dsp.c b/drivers/dsp/sun55i/dsp.c
+new file mode 100644
+index 00000000000..5b056a2f935
+--- /dev/null
++++ b/drivers/dsp/sun55i/dsp.c
+@@ -0,0 +1,312 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * drivers/dsp/sun55i/dsp.c
++ *
++ * HiFi4 DSP boot driver for Allwinner T527/A523 (sun55iw3)
++ *
++ * Based on sun8iw20 driver from YuzukiHD/FreeRTOS-HIFI4-DSP
++ * and Linux kernel BSP driver (sunxi_rproc_hifi4_boot.c)
++ *
++ * Key differences from sun8iw20:
++ * - AArch64 with 64-bit physical addresses
++ * - DSP CFG registers at 0x07100000 (vs 0x01700000)
++ * - MCU CCU at 0x07102000 for DSP clock gating and resets
++ * - SRAM remap flag at 0x07010364
++ * - No DRAM address remapping (0x10000000 <-> 0x30000000 not used)
++ *
++ * Copyright (c) 2007-2025 Allwinnertech Co., Ltd.
++ * Copyright (c) 2025 Armbian
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ */
++
++#include <asm/io.h>
++#include <log.h>
++#include <string.h>
++#include <asm/global_data.h>
++
++#include "dsp_reg.h"
++#include "elf.h"
++#include "fdt_support.h"
++#include "platform.h"
++
++#include "../common/dsp_fdt.h"
++#include "../common/dsp_ic.h"
++#include "../common/dsp_img.h"
++
++#define readl_dsp(addr) readl((const volatile void *)(addr))
++#define writel_dsp(val, addr) writel((u32)(val), (volatile void *)(addr))
++
++#define ROUND_DOWN(a, b) ((a) & ~((b)-1))
++#define ROUND_UP(a, b) (((a) + (b)-1) & ~((b)-1))
++
++#define ROUND_DOWN_CACHE(a) ROUND_DOWN(a, CONFIG_SYS_CACHELINE_SIZE)
++#define ROUND_UP_CACHE(a) ROUND_UP(a, CONFIG_SYS_CACHELINE_SIZE)
++
++static void sunxi_dsp_set_runstall(u32 dsp_id, u32 value)
++{
++	u32 reg_val;
++
++	if (dsp_id == 0) {
++		reg_val = readl_dsp(DSP0_CFG_BASE + DSP_CTRL_REG0);
++		reg_val &= ~(1 << BIT_RUN_STALL);
++		reg_val |= (value << BIT_RUN_STALL);
++		writel_dsp(reg_val, (DSP0_CFG_BASE + DSP_CTRL_REG0));
++	}
++}
++
++static int update_reset_vec(u32 img_addr, u32 *run_addr)
++{
++	Elf32_Ehdr *ehdr;
++
++	ehdr = (Elf32_Ehdr *)(ADDR_TPYE)img_addr;
++	if (!*run_addr)
++		*run_addr = ehdr->e_entry;
++
++	return 0;
++}
++
++static int load_image(u32 img_addr, u32 dsp_id)
++{
++	Elf32_Ehdr *ehdr;
++	Elf32_Phdr *phdr;
++	void *dst = NULL;
++	void *src = NULL;
++	int i = 0;
++	ulong mem_start = 0;
++	u32 mem_size = 0;
++
++	ehdr = (Elf32_Ehdr *)(ADDR_TPYE)img_addr;
++	phdr = (Elf32_Phdr *)(ADDR_TPYE)(img_addr + ehdr->e_phoff);
++
++	for (i = 0; i < ehdr->e_phnum; ++i) {
++		dst = (void *)(ADDR_TPYE)phdr->p_paddr;
++		src = (void *)(ADDR_TPYE)img_addr + phdr->p_offset;
++
++		DSP_DEBUG("Loading phdr %i from 0x%x to 0x%p (%i bytes)\n", i,
++			  phdr->p_paddr, dst, phdr->p_filesz);
++
++		if (phdr->p_filesz)
++			memcpy(dst, src, phdr->p_filesz);
++		if (phdr->p_filesz != phdr->p_memsz)
++			memset(dst + phdr->p_filesz, 0x00,
++			       phdr->p_memsz - phdr->p_filesz);
++		if (i == 0)
++			show_img_version((char *)dst + 896, dsp_id);
++
++		++phdr;
++	}
++
++	dts_get_dsp_memory(&mem_start, &mem_size, dsp_id);
++	if (!mem_start || !mem_size) {
++		pr_err("dts_get_dsp_memory fail\n");
++	} else {
++		flush_cache(ROUND_DOWN_CACHE(mem_start),
++			    ROUND_UP_CACHE(mem_size));
++	}
++	return 0;
++}
++
++/*
++ * Configure main CCU DSP clock (offset 0xc70)
++ * Select PLL_PERI0_2X as source with divider to get target frequency.
++ * T527 DSP target: 600MHz from PLL_PERI0_2X (1200MHz) / 2
++ */
++static void dsp_freq_default_set(void)
++{
++	u32 val;
++
++	val = DSP_CLK_SRC_PERI2X | DSP_CLK_FACTOR_M(2) |
++	      (1 << BIT_DSP_SCLK_GATING);
++	writel_dsp(val, (SUNXI_CCM_BASE + CCMU_DSP_CLK_REG));
++}
++
++/*
++ * SRAM remap: controls whether HiFi4 DSP can access its local SRAM.
++ * value=1: CPU uses SRAM (for loading firmware)
++ * value=0: DSP uses SRAM (normal operation)
++ */
++static void sram_remap_set(int value)
++{
++	u32 val;
++
++	val = readl_dsp(SRAM_REMAP_BASE);
++	val &= ~(1 << BIT_SRAM_REMAP_ENABLE);
++	val |= (value << BIT_SRAM_REMAP_ENABLE);
++	writel_dsp(val, SRAM_REMAP_BASE);
++}
++
++/*
++ * Enable MCU CCU bus clocks and deassert resets for DSP.
++ * On T527, clock gating and resets are in the MCU CCU, not the main CCU.
++ *
++ * MCU CCU register map (relative to MCU_CCU_BASE = 0x07102000):
++ *   0x068: Bus DSP MSGBOX clock gate + reset
++ *   0x06c: Bus DSP CFG clock gate + reset
++ *   0x100: DSP mod reset + DSP debug reset
++ */
++static void mcu_ccu_dsp_enable(void)
++{
++	u32 val;
++
++	/* Enable Bus DSP MSGBOX clock gate */
++	val = readl_dsp(MCU_CCU_BASE + MCU_CCU_BUS_DSP_MSGBOX_BGR);
++	val |= (1 << MCU_BIT_DSP_MSGBOX_GATING);
++	writel_dsp(val, MCU_CCU_BASE + MCU_CCU_BUS_DSP_MSGBOX_BGR);
++
++	/* Enable Bus DSP CFG clock gate */
++	val = readl_dsp(MCU_CCU_BASE + MCU_CCU_BUS_DSP_CFG_BGR);
++	val |= (1 << MCU_BIT_DSP_CFG_GATING);
++	writel_dsp(val, MCU_CCU_BASE + MCU_CCU_BUS_DSP_CFG_BGR);
++
++	/* Deassert Bus DSP MSGBOX reset */
++	val = readl_dsp(MCU_CCU_BASE + MCU_CCU_BUS_DSP_MSGBOX_BGR);
++	val |= (1 << 16) | (1 << MCU_BIT_DSP_MSGBOX_RST);
++	writel_dsp(val, MCU_CCU_BASE + MCU_CCU_BUS_DSP_MSGBOX_BGR);
++
++	/* Deassert Bus DSP CFG reset */
++	val = readl_dsp(MCU_CCU_BASE + MCU_CCU_BUS_DSP_CFG_BGR);
++	val |= (1 << 16) | (1 << MCU_BIT_DSP_CFG_RST);
++	writel_dsp(val, MCU_CCU_BASE + MCU_CCU_BUS_DSP_CFG_BGR);
++}
++
++/*
++ * Assert DSP mod and debug resets via MCU CCU before boot.
++ */
++static void mcu_ccu_dsp_assert_reset(void)
++{
++	u32 val;
++
++	/* Assert DSP mod + debug resets (write 1 to bits [16+17] to deassert later) */
++	val = readl_dsp(MCU_CCU_BASE + MCU_CCU_DSP_RST_REG);
++	val &= ~((1 << MCU_BIT_DSP_DEBUG_RST) | (1 << MCU_BIT_DSP_RST));
++	writel_dsp(val, MCU_CCU_BASE + MCU_CCU_DSP_RST_REG);
++}
++
++/*
++ * Deassert DSP mod and debug resets via MCU CCU after configuration.
++ */
++static void mcu_ccu_dsp_deassert_reset(void)
++{
++	u32 val;
++
++	/* Deassert DSP debug reset */
++	val = readl_dsp(MCU_CCU_BASE + MCU_CCU_DSP_RST_REG);
++	val |= (1 << 16) | (1 << MCU_BIT_DSP_DEBUG_RST);
++	writel_dsp(val, MCU_CCU_BASE + MCU_CCU_DSP_RST_REG);
++
++	/* Deassert DSP mod reset */
++	val = readl_dsp(MCU_CCU_BASE + MCU_CCU_DSP_RST_REG);
++	val |= (1 << 17) | (1 << MCU_BIT_DSP_RST);
++	writel_dsp(val, MCU_CCU_BASE + MCU_CCU_DSP_RST_REG);
++}
++
++int sunxi_dsp_init(u32 img_addr, u32 run_ddr, u32 dsp_id)
++{
++	u32 reg_val;
++	u32 image_len = 0;
++	struct dts_msg_t dts_msg;
++	unsigned long section_addr = 0;
++	char *str = ".oemhead.text";
++	int ret = 0;
++
++#ifdef CONFIG_SUNXI_VERIFY_DSP
++	if (sunxi_verify_dsp(img_addr, image_len, dsp_id) < 0) {
++		return -1;
++	}
++#endif
++
++	memset((void *)&dts_msg, 0, sizeof(struct dts_msg_t));
++
++	ret = dts_dsp_status(&dts_msg, dsp_id);
++	if (ret < 0) {
++		printf("dsp%d:dsp close in dts\n", dsp_id);
++		return 0;
++	}
++
++	ret = dts_uart_msg(&dts_msg, dsp_id);
++	if (ret < 0)
++		printf("dsp%d:uart config fail\n", dsp_id);
++
++	ret = dts_gpio_int_msg(&dts_msg, dsp_id);
++	if (ret < 0)
++		printf("dsp%d:gpio init config fail\n", dsp_id);
++
++	ret = dts_sharespace_msg(&dts_msg, dsp_id);
++	if (ret < 0)
++		printf("dsp%d:sharespace config fail\n", dsp_id);
++
++	/* Set CPU access to SRAM (for firmware loading) */
++	sram_remap_set(1);
++
++	/* Parse ELF entry point */
++	update_reset_vec(img_addr, &run_ddr);
++
++	/* Find OEM section in firmware image */
++	ret = find_img_section(img_addr, str, &section_addr);
++	if (ret < 0) {
++		printf("dsp%d:find section err\n", dsp_id);
++		return -1;
++	}
++
++	/* Get firmware length */
++	ret = get_img_len(img_addr, section_addr, &image_len);
++	if (ret < 0) {
++		printf("dsp%d:get img len err\n", dsp_id);
++		return -1;
++	}
++
++	/* Patch DTS message into firmware */
++	ret = set_msg_dts(img_addr, section_addr, &dts_msg);
++	if (ret < 0) {
++		printf("dsp%d:set img dts err\n", dsp_id);
++		return -1;
++	}
++
++	/* Configure main CCU DSP clock: PLL_PERI0_2X / 2 */
++	dsp_freq_default_set();
++
++	/* Enable MCU CCU bus clocks and deassert bus resets */
++	mcu_ccu_dsp_enable();
++
++	/* Assert DSP core resets before configuration */
++	mcu_ccu_dsp_assert_reset();
++
++	if (dsp_id == 0) {
++		/* Set boot vector address */
++		if (run_ddr != DSP_DEFAULT_RST_VEC) {
++			writel_dsp(run_ddr,
++				   DSP0_CFG_BASE + DSP_ALT_RESET_VEC_REG);
++
++			reg_val = readl_dsp(DSP0_CFG_BASE + DSP_CTRL_REG0);
++			reg_val |= (1 << BIT_START_VEC_SEL);
++			writel_dsp(reg_val, DSP0_CFG_BASE + DSP_CTRL_REG0);
++		}
++
++		/* Hold DSP in reset (runstall) */
++		sunxi_dsp_set_runstall(dsp_id, 1);
++
++		/* Enable DSP clock */
++		reg_val = readl_dsp(DSP0_CFG_BASE + DSP_CTRL_REG0);
++		reg_val |= (1 << BIT_DSP_CLKEN);
++		writel_dsp(reg_val, DSP0_CFG_BASE + DSP_CTRL_REG0);
++
++		/* Deassert DSP core resets */
++		mcu_ccu_dsp_deassert_reset();
++
++		/* Load firmware into memory */
++		load_image(img_addr, dsp_id);
++
++		/* Give SRAM access back to DSP */
++		sram_remap_set(0);
++
++		/* Release DSP from reset */
++		sunxi_dsp_set_runstall(dsp_id, 0);
++	}
++
++	printf("DSP%d start ok, img length %d, booting from 0x%x\n", dsp_id,
++	       image_len, run_ddr);
++	return 0;
++}
+diff --git a/drivers/dsp/sun55i/dsp_reg.h b/drivers/dsp/sun55i/dsp_reg.h
+new file mode 100644
+index 00000000000..2757593846f
+--- /dev/null
++++ b/drivers/dsp/sun55i/dsp_reg.h
+@@ -0,0 +1,152 @@
++/* SPDX-License-Identifier: GPL-2.0+ */
++/*
++ * drivers/dsp/sun55i/dsp_reg.h
++ *
++ * Register definitions for Allwinner T527/A523 HiFi4 DSP
++ *
++ * Based on sun8iw20 driver from YuzukiHD/FreeRTOS-HIFI4-DSP
++ * and Linux kernel device tree / MCU CCU driver for sun55i-a523.
++ *
++ * Copyright (c) 2007-2025 Allwinnertech Co., Ltd.
++ * Copyright (c) 2025 Armbian
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ */
++
++#ifndef __DSP_REG_H
++#define __DSP_REG_H
++
++/*
++ * DSP CFG BASE (from sun55i-t527.dtsi: dsp0_rproc hifi4-cfg reg)
++ */
++#define DSP0_CFG_BASE (0x07100000)
++#define DSP0_CFG_SIZE (0x40)
++
++/*
++ * MCU CCU BASE (from sun55i-t527.dtsi: mcu_ccu@7102000)
++ */
++#define MCU_CCU_BASE (0x07102000)
++#define MCU_CCU_SIZE (0x200)
++
++/*
++ * Main CCU BASE (from sun55i-a523.dtsi: ccu@2001000)
++ */
++#define SUNXI_CCM_BASE (0x02001000)
++
++/*
++ * SRAM remap register (from sun55i-t527.dtsi: sram-for-cpux@07010364)
++ */
++#define SRAM_REMAP_BASE (0x07010364)
++
++/*
++ * DSP default reset vector address
++ */
++#define DSP_DEFAULT_RST_VEC (0x100000)
++
++/*
++ * HiFi4 Core Register Offsets (at DSP0_CFG_BASE)
++ * Same register layout as sun8iw20 - HiFi4 core registers are standard
++ */
++#define DSP_ALT_RESET_VEC_REG (0x0000) /* DSP Reset Vector Register */
++#define DSP_CTRL_REG0         (0x0004) /* DSP Control Register 0 */
++#define DSP_BOOT_SRAM_REMAP   (0x0008) /* DSP Boot SRAM Remap Register */
++#define DSP_PRID_REG          (0x000c) /* DSP PRID Register */
++#define DSP_STAT_REG          (0x0010) /* DSP Status Register */
++#define DSP_BIST_CTRL_REG     (0x0014) /* DSP BIST Control Register */
++#define DSP_JTRST_REG         (0x001c) /* DSP JTAG Config Reset Register */
++#define DSP_VER_REG           (0x0020) /* DSP Version Register */
++
++/*
++ * DSP Control Register 0 bits
++ */
++#define BIT_RUN_STALL    (0)
++#define BIT_START_VEC_SEL (1)
++#define BIT_DSP_CLKEN    (2)
++
++/*
++ * DSP PRID Register
++ */
++#define PRID_MASK (0xff << 0)
++
++/*
++ * DSP Status Register bits
++ */
++#define BIT_PFAULT_INFO_VALID (0)
++#define BIT_PFAULT_ERROR      (1)
++#define BIT_DOUBLE_EXCE_ERROR (2)
++#define BIT_XOCD_MODE         (3)
++#define BIT_DEBUG_MODE        (4)
++#define BIT_PWAIT_MODE        (5)
++#define BIT_IRAM0_LOAD_STORE  (6)
++
++/*
++ * BIST Control Register bits
++ */
++#define BIT_BIST_EN             (0)
++#define BIST_WDATA_PAT_MASK    (0x7 << 1)
++#define BIT_BIST_ADDR_MODE_SEL (4)
++#define BIST_REG_SEL_MASK      (0x7 << 5)
++#define BIT_BIST_BUSY          (8)
++#define BIT_BIST_STOP          (9)
++#define BIST_ERR_CYC_MASK     (0x3 << 10)
++#define BIST_ERR_PAT_MASK     (0x7 << 12)
++#define BIT_BIST_ERR_STA      (15)
++#define BIST_SELECT_MASK      (0xf << 16)
++
++/*
++ * DSP Version Register bits
++ */
++#define SMALL_VER_MASK (0x1f << 0)
++#define LARGE_VER_MASK (0x1f << 16)
++
++/*
++ * SRAM Remap Register bits
++ */
++#define BIT_SRAM_REMAP_ENABLE (0)
++
++/*
++ * Main CCU DSP Clock Register (CCU offset 0xc70)
++ * Same offset as sun8iw20 - div/mux/gate
++ */
++#define CCMU_DSP_CLK_REG     (0xc70)
++#define BIT_DSP_SCLK_GATING  (31)
++#define DSP_CLK_M_MASK       (0x1f << 0)
++#define DSP_CLK_SRC_MASK     (0x7 << 24)
++#define DSP_CLK_SRC_HOSC     (0)
++#define DSP_CLK_SRC_32K      (0x1 << 24)
++#define DSP_CLK_SRC_16M      (0x2 << 24)
++#define DSP_CLK_SRC_PERI2X   (0x3 << 24)
++#define DSP_CLK_SRC_PLL_AUDIO1_DIV5 (0x4 << 24)
++/* x must be 1 - 32 */
++#define DSP_CLK_FACTOR_M(x)  (((x)-1) << 0)
++
++/*
++ * MCU CCU Register Offsets (relative to MCU_CCU_BASE = 0x07102000)
++ * From ccu-sun55i-a523-mcu.c in Linux kernel
++ */
++
++/* MCU CCU DSP Clock Register (offset 0x0020) */
++/* Mux: bits [26:24], M divider: bits [4:0], Gate: bit [31] */
++/* Parents: hosc, losc, iosc, pll_audio1_div5, pll_audio1_div2, dsp(from main CCU) */
++#define MCU_CCU_DSP_CLK_REG    (0x0020)
++
++/* MCU CCU Bus Clock Gates */
++#define MCU_CCU_BUS_DSP_MSGBOX_BGR (0x0068) /* Bus DSP MSGBOX gate + reset */
++#define MCU_CCU_BUS_DSP_CFG_BGR    (0x006c) /* Bus DSP CFG gate + reset */
++
++/* MCU CCU DSP Resets */
++#define MCU_CCU_DSP_RST_REG        (0x0100) /* DSP + DSP_DEBUG resets */
++
++/* Bus gate bits */
++#define MCU_BIT_DSP_MSGBOX_GATING (0)
++#define MCU_BIT_DSP_CFG_GATING    (0)
++
++/* Reset bits (active low, bit [16] = assert, write 1 to assert) */
++#define MCU_BIT_DSP_MSGBOX_RST    (0)
++#define MCU_BIT_DSP_CFG_RST       (0)
++#define MCU_BIT_DSP_DEBUG_RST     (16)
++#define MCU_BIT_DSP_RST           (17)
++
++#endif /* __DSP_REG_H */
+diff --git a/drivers/dsp/sun55i/platform.h b/drivers/dsp/sun55i/platform.h
+new file mode 100644
+index 00000000000..167cf4c6e34
+--- /dev/null
++++ b/drivers/dsp/sun55i/platform.h
+@@ -0,0 +1,101 @@
++/* SPDX-License-Identifier: GPL-2.0+ */
++/*
++ * drivers/dsp/sun55i/platform.h
++ *
++ * Platform definitions for Allwinner T527/A523 HiFi4 DSP
++ *
++ * Based on sun8iw20 driver from YuzukiHD/FreeRTOS-HIFI4-DSP
++ *
++ * Copyright (c) 2007-2025 Allwinnertech Co., Ltd.
++ * Copyright (c) 2025 Armbian
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ */
++
++#ifndef __SUNXI_PLATFORM_H
++#define __SUNXI_PLATFORM_H
++
++#include "../common/imgdts.h"
++
++#define RTOS_MAGIC "freertos"
++#define MAGIC_SIZE 8
++#define RTOS_VERSION 1
++#define PADDING_LEN (512)
++
++typedef struct rtos_img_hdr_t {
++  unsigned int jump_instruction;
++  unsigned char magic[MAGIC_SIZE];
++  unsigned int check_sum;
++  unsigned int image_size;
++  unsigned int header_size;
++  unsigned int rtos_version;
++  unsigned int dram_size;
++  unsigned int rtos_run_addr;
++  unsigned int dtb_addr;
++  unsigned int dtb_size;
++  struct dts_msg_t dts_msg;
++  unsigned char reserved[4];
++} rtos_img_hdr;
++
++typedef struct box_start_os_cfg {
++  unsigned int used;
++  unsigned int start_type;
++  unsigned int irkey_used;
++  unsigned int pmukey_used;
++  unsigned int pmukey_num;
++  unsigned int led_power;
++  unsigned int led_state;
++} box_start_os_cfg_t;
++
++struct dram_para_32 {
++  unsigned int dram_clk;
++  unsigned int dram_type;
++  unsigned int dram_zq;
++  unsigned int dram_odt_en;
++  unsigned int dram_para1;
++  unsigned int dram_para2;
++  unsigned int dram_mr0;
++  unsigned int dram_mr1;
++  unsigned int dram_mr2;
++  unsigned int dram_mr3;
++  unsigned int dram_tpr0;
++  unsigned int dram_tpr1;
++  unsigned int dram_tpr2;
++  unsigned int dram_tpr3;
++  unsigned int dram_tpr4;
++  unsigned int dram_tpr5;
++  unsigned int dram_tpr6;
++  unsigned int dram_tpr7;
++  unsigned int dram_tpr8;
++  unsigned int dram_tpr9;
++  unsigned int dram_tpr10;
++  unsigned int dram_tpr11;
++  unsigned int dram_tpr12;
++  unsigned int dram_tpr13;
++  unsigned int dram_tpr14;
++  unsigned int dram_tpr15;
++  unsigned int dram_tpr16;
++  unsigned int dram_tpr17;
++  unsigned int dram_tpr18;
++  unsigned int dram_tpr19;
++  unsigned int dram_tpr20;
++  unsigned int dram_tpr21;
++};
++
++struct rtos_img_params_t {
++  struct dram_para_32 dram_para;
++  struct box_start_os_cfg start_os;
++};
++
++struct spare_rtos_head_t {
++  struct rtos_img_hdr_t rtos_img_hdr;
++  struct rtos_img_params_t rtos_img_params;
++  unsigned char padding[PADDING_LEN - sizeof(struct rtos_img_hdr_t) -
++                        sizeof(struct rtos_img_params_t)];
++  unsigned char cert_magic[MAGIC_SIZE];
++  unsigned int cert_size;
++};
++
++#endif /* __SUNXI_PLATFORM_H */
+diff --git a/board/sunxi/board.c b/board/sunxi/board.c
+index 2929bc17f08..92b40cb0ed5 100644
+--- a/board/sunxi/board.c
++++ b/board/sunxi/board.c
+@@ -852,6 +852,13 @@ int board_late_init(void)
+ 	usb_ether_init();
+ #endif
+ 
++#ifdef CONFIG_XTENSA_DSP
++	{
++		extern int sunxi_dsp_init(u32 img_addr, u32 run_ddr, u32 dsp_id);
++		sunxi_dsp_init(0, 0, 0);
++	}
++#endif
++
+ 	return 0;
+ }
+ 
+diff --git a/drivers/Kconfig b/drivers/Kconfig
+index fe35e07b124..feb8b2813b5 100644
+--- a/drivers/Kconfig
++++ b/drivers/Kconfig
+@@ -30,6 +30,9 @@ source "drivers/crypto/Kconfig"
+ 
+ source "drivers/ddr/Kconfig"
+ 
++source "drivers/dsp/Kconfig"
++
++
+ source "drivers/demo/Kconfig"
+ 
+ source "drivers/ddr/fsl/Kconfig"
+diff --git a/drivers/Makefile b/drivers/Makefile
+index 77fc66eb8ba..7e00c7bc304 100644
+--- a/drivers/Makefile
++++ b/drivers/Makefile
+@@ -133,3 +133,4 @@ obj-$(CONFIG_$(PHASE_)DM_RNG) += rng/
+ endif
+ 
+ obj-y += soc/
++obj-$(CONFIG_XTENSA_DSP) += dsp/
+diff --git a/dts/upstream/src/arm64/allwinner/sun55i-a523.dtsi b/dts/upstream/src/arm64/allwinner/sun55i-a523.dtsi
+index 6b6f2296bdf..aabbccdd001 100644
+--- a/dts/upstream/src/arm64/allwinner/sun55i-a523.dtsi
++++ b/dts/upstream/src/arm64/allwinner/sun55i-a523.dtsi
+@@ -691,4 +691,10 @@
+ 		};
+ 	};
++
++dsp0: dsp@7100000 {
++	compatible = "allwinner,sun55i-a523-dsp";
++	status = "okay";
++};
++
+ };
+ };
