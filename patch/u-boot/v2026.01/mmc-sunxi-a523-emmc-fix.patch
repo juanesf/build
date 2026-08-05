@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Juan Sanchez Fuentes <juanesf91@gmail.com>
 Date: Thu, 24 Jul 2026 00:00:00 +0000
-Subject: [PATCH] mmc: sunxi: be conservative with A523 MMC in SPL
+Subject: [PATCH] mmc: sunxi: force A523 CCLK_DIV=/2 in SPL and U-Boot proper
 
 On the Allwinner A523/T527 (Avaota A1), booting from SD card in SPL fails
 with:
@@ -13,17 +13,22 @@ The A523 upstream clock handling is tuned for the main SD slot, but the
 SPL still runs the card at high speed / 4-bit mode, which causes read
 errors on some boards/cards.  Make the SPL MMC path conservative for all
 A523 controllers: cap the clock, force CCLK_DIV=/2, and do not advertise
-high-speed modes.  8-bit bus is still allowed for eMMC.  U-Boot proper
-keeps the full 4/8-bit and HS capabilities.
+high-speed modes.  8-bit bus is still allowed for eMMC.
+
+CCLK_DIV=0 is undefined on the A523, so U-Boot proper must force
+CCLK_DIV=/2 on this SoC as well; otherwise eMMC block reads become
+unreliable (the FAT directory entry for /boot/boot.scr is found, but the
+file data cannot be read).  The halved internal clock keeps U-Boot proper
+reads conservative while retaining the full 4/8-bit and HS capabilities.
 
 Signed-off-by: Juan Sanchez Fuentes <juanesf91@gmail.com>
 Assisted-by: opencode:deepseek-v4-flash-free
 ---
- drivers/mmc/sunxi_mmc.c | 34 +++++++++++++++++++++++++++-------
- 1 file changed, 27 insertions(+), 7 deletions(-)
+ drivers/mmc/sunxi_mmc.c | 51 ++++++++++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 45 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/mmc/sunxi_mmc.c b/drivers/mmc/sunxi_mmc.c
-index e28c81a..c0c9e36 100644
+index e28c81afffe..9bf762da6b1 100644
 --- a/drivers/mmc/sunxi_mmc.c
 +++ b/drivers/mmc/sunxi_mmc.c
 @@ -77,6 +77,9 @@ static int mmc_set_mod_clk(struct sunxi_mmc_priv *priv, unsigned int hz)
@@ -53,7 +58,7 @@ index e28c81a..c0c9e36 100644
  
  	/* Disable Clock */
  	rval &= ~SUNXI_MMC_CLK_ENABLE;
-@@ -212,11 +225,16 @@ static int mmc_config_clock(struct sunxi_mmc_priv *priv, struct mmc *mmc)
+@@ -212,11 +225,14 @@ static int mmc_config_clock(struct sunxi_mmc_priv *priv, struct mmc *mmc)
  		return -1;
  
  	/* Set mod_clk to new rate */
@@ -63,15 +68,13 @@ index e28c81a..c0c9e36 100644
  
  	/* Clear internal divider */
  	rval &= ~SUNXI_MMC_CLK_DIVIDER_MASK;
-+	/* On A523 CCLK_DIV=0 is undefined; use /2 in SPL. */
-+	#ifdef CONFIG_XPL_BUILD
++	/* On A523 CCLK_DIV=0 is undefined; use /2. */
 +	if (IS_ENABLED(CONFIG_MACH_SUN55I_A523))
 +		rval |= 1;
-+	#endif
  	writel(rval, &priv->reg->clkcr);
  
  #if defined(CONFIG_SUNXI_GEN_SUN6I) || defined(CONFIG_SUN50I_GEN_H6) || defined(CONFIG_SUNXI_GEN_NCAT2)
-@@ -573,18 +591,41 @@ struct mmc *sunxi_mmc_init(int sdc_no)
+@@ -573,18 +589,41 @@ struct mmc *sunxi_mmc_init(int sdc_no)
  	cfg->ops  = &sunxi_mmc_ops;
  
  	cfg->voltages = MMC_VDD_32_33 | MMC_VDD_33_34;
