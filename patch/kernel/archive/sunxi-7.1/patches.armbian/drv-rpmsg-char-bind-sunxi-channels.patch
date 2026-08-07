@@ -1,0 +1,100 @@
+diff --git a/drivers/rpmsg/rpmsg_char.c b/drivers/rpmsg/rpmsg_char.c
+index bff5aefee212..d619063ccfbf 100644
+--- a/drivers/rpmsg/rpmsg_char.c
++++ b/drivers/rpmsg/rpmsg_char.c
+@@ -77,13 +77,17 @@ struct rpmsg_eptdev {
+ int rpmsg_chrdev_eptdev_destroy(struct device *dev, void *data)
+ {
+ 	struct rpmsg_eptdev *eptdev = dev_to_eptdev(dev);
++	struct rpmsg_device *rpdev = eptdev->rpdev;
+ 
+ 	mutex_lock(&eptdev->ept_lock);
+ 	eptdev->rpdev = NULL;
+ 	if (eptdev->ept) {
+ 		/* The default endpoint is released by the rpmsg core */
+-		if (!eptdev->default_ept)
++		if (!eptdev->default_ept) {
++			if (rpdev && rpdev->ept == eptdev->ept)
++				rpdev->ept = NULL;
+ 			rpmsg_destroy_ept(eptdev->ept);
++		}
+ 		eptdev->ept = NULL;
+ 	}
+ 	mutex_unlock(&eptdev->ept_lock);
+@@ -176,6 +180,29 @@ static int rpmsg_eptdev_open(struct inode *inode, struct file *filp)
+ 
+ 	ept->flow_cb = rpmsg_ept_flow_cb;
+ 	eptdev->ept = ept;
++
++	/*
++	 * If this is a newly created endpoint on a device that is marked to
++	 * announce, advertise our endpoint address back to the remote
++	 * processor.  This lets the remote (e.g. sunxi E906 name-service
++	 * channels) learn where to send data to us.
++	 */
++	if (!eptdev->default_ept && rpdev->announce &&
++	    rpdev->ops && rpdev->ops->announce_create) {
++		rpdev->ept = ept;
++		rpdev->ops->announce_create(rpdev);
++	}
++
++	/*
++	 * sunxi E906 name-service channels (client, heartbeat) only learn our
++	 * endpoint address once they receive a message: their endpoints are
++	 * auto-bound on RX and the announce-back is not consumed by them.
++	 * Send a one-byte no-op so the remote endpoint binds and starts
++	 * sending data (heartbeat, client create) to us.
++	 */
++	if (rpdev->announce && !strncmp(rpdev->id.name, "sunxi,", 6))
++		rpmsg_trysendto(ept, "\0", 1, eptdev->chinfo.dst);
++
+ 	filp->private_data = eptdev;
+ 	mutex_unlock(&eptdev->ept_lock);
+ 
+@@ -185,13 +212,17 @@ static int rpmsg_eptdev_open(struct inode *inode, struct file *filp)
+ static int rpmsg_eptdev_release(struct inode *inode, struct file *filp)
+ {
+ 	struct rpmsg_eptdev *eptdev = cdev_to_eptdev(inode->i_cdev);
++	struct rpmsg_device *rpdev = eptdev->rpdev;
+ 	struct device *dev = &eptdev->dev;
+ 
+ 	/* Close the endpoint, if it's not already destroyed by the parent */
+ 	mutex_lock(&eptdev->ept_lock);
+ 	if (eptdev->ept) {
+-		if (!eptdev->default_ept)
++		if (!eptdev->default_ept) {
++			if (rpdev && rpdev->ept == eptdev->ept)
++				rpdev->ept = NULL;
+ 			rpmsg_destroy_ept(eptdev->ept);
++		}
+ 		eptdev->ept = NULL;
+ 	}
+ 	mutex_unlock(&eptdev->ept_lock);
+@@ -534,6 +565,8 @@ static void rpmsg_chrdev_remove(struct rpmsg_device *rpdev)
+ static struct rpmsg_device_id rpmsg_chrdev_id_table[] = {
+ 	{ .name	= "rpmsg-raw" },
+ 	{ .name	= "rpmsg_chrdev" },
++	{ .name	= "sunxi,rpmsg_client" },
++	{ .name	= "sunxi,rpmsg_heartbeat" },
+ 	{ },
+ };
+ MODULE_DEVICE_TABLE(rpmsg, rpmsg_chrdev_id_table);
+diff --git a/drivers/rpmsg/virtio_rpmsg_bus.c b/drivers/rpmsg/virtio_rpmsg_bus.c
+index 1b8bb05924af..eee98af52212 100644
+--- a/drivers/rpmsg/virtio_rpmsg_bus.c
++++ b/drivers/rpmsg/virtio_rpmsg_bus.c
+@@ -420,6 +420,14 @@ static struct rpmsg_device *__rpmsg_create_channel(struct virtproc_info *vrp,
+ 	 */
+ 	rpdev->announce = rpdev->src != RPMSG_ADDR_ANY;
+ 
++	/*
++	 * sunxi E906: channels announced by the remote (rpmsg client,
++	 * heartbeat) still need our endpoint address announced back,
++	 * otherwise the remote cannot send data to us.
++	 */
++	if (!strncmp(chinfo->name, "sunxi,", 6))
++		rpdev->announce = true;
++
+ 	strscpy(rpdev->id.name, chinfo->name, sizeof(rpdev->id.name));
+ 
+ 	rpdev->dev.parent = &vrp->vdev->dev;

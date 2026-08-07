@@ -33,10 +33,10 @@ index 1c7598b8475d..3d1fd410690f 100644
 +obj-$(CONFIG_SUN55I_E906_REMOTEPROC)	+= sun55i_e906_rproc.o
 diff --git a/drivers/remoteproc/sun55i_e906_rproc.c b/drivers/remoteproc/sun55i_e906_rproc.c
 new file mode 100644
-index 000000000000..1d91aaf3aa8d
+index 000000000000..5bf1bc477293
 --- /dev/null
 +++ b/drivers/remoteproc/sun55i_e906_rproc.c
-@@ -0,0 +1,691 @@
+@@ -0,0 +1,692 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +#include <linux/clk.h>
 +#include <linux/dma-mapping.h>
@@ -551,6 +551,7 @@ index 000000000000..1d91aaf3aa8d
 +	.parse_fw	= sun55i_e906_parse_fw,
 +	.load		= sun55i_e906_load,
 +	.get_loaded_rsc_table = sun55i_e906_get_loaded_rsc_table,
++	.find_loaded_rsc_table = rproc_elf_find_loaded_rsc_table,
 +	.sanity_check	= rproc_elf_sanity_check,
 +	.get_boot_addr	= rproc_elf_get_boot_addr,
 +};
