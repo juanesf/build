@@ -1,0 +1,108 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Juan Sanchez <juanesf91@gmail.com>
+Date: Fri, 18 Sep 2026 19:50:00 -0500
+Subject: dt-bindings: phy: add Allwinner A523/T527 USB3/PCIe combo PHY binding
+
+Document the Innosilicon combo PHY found on Allwinner A523/T527 SoCs.
+The lane is shared between the PCIe and the USB3 controllers; the
+consumer selects the intended use with the single phy-cell argument
+(PHY_TYPE_PCIE or PHY_TYPE_USB3).
+
+Co-authored-by: opencode <noreply@opencode.ai>
+Signed-off-by: Juan Sanchez <juanesf91@gmail.com>
+---
+
+diff --git a/Documentation/devicetree/bindings/phy/allwinner,sun55i-a523-combophy.yaml b/Documentation/devicetree/bindings/phy/allwinner,sun55i-a523-combophy.yaml
+new file mode 100644
+index 000000000000..111111111111 100644
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/allwinner,sun55i-a523-combophy.yaml
+@@ -0,0 +1,86 @@
++# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
++%YAML 1.2
++---
++$id: http://devicetree.org/schemas/phy/allwinner,sun55i-a523-combophy.yaml#
++$schema: http://devicetree.org/meta-schemas/core.yaml#
++
++title: Allwinner A523/T527 USB3.0/PCIe Combo PHY
++
++maintainers:
++  - Chen-Yu Tsai <wens@csie.org>
++  - Jernej Skrabec <jernej.skrabec@gmail.com>
++
++description: |
++  The Innosilicon combo PHY in Allwinner A523/T527 SoCs provides a single
++  lane that is shared between the PCIe controller and the USB3 controller;
++  only one of them can use the lane at any given time. The consumer
++  selects the intended use with the single phy-cell argument,
++  PHY_TYPE_PCIE or PHY_TYPE_USB3, as defined in
++  include/dt-bindings/phy/phy.h.
++
++properties:
++  compatible:
++    const: allwinner,sun55i-a523-combophy
++
++  reg:
++    items:
++      - description: PCIe/USB3 sub-system control registers
++      - description: Combo PHY analog registers
++
++  reg-names:
++    items:
++      - const: phy-ctl
++      - const: phy-clk
++
++  "#phy-cells":
++    const: 1
++
++  clocks:
++    items:
++      - description: PHY reference clock
++      - description: parent clock of the PHY reference clock
++
++  clock-names:
++    items:
++      - const: phyclk_ref
++      - const: refclk_par
++
++  resets:
++    items:
++      - description: Reset of the PCIe/USB3 sub-system
++
++  reset-names:
++    items:
++      - const: phy_rst
++
++  power-domains:
++    maxItems: 1
++
++required:
++  - compatible
++  - reg
++  - reg-names
++  - "#phy-cells"
++  - clocks
++  - clock-names
++  - resets
++  - reset-names
++
++additionalProperties: false
++
++examples:
++  - |
++    #include <dt-bindings/clock/sun55i-a523-ccu.h>
++    #include <dt-bindings/reset/sun55i-a523-ccu.h>
++
++    phy@4f00000 {
++        compatible = "allwinner,sun55i-a523-combophy";
++        reg = <0x04f00000 0x80000>, <0x04f80000 0x80000>;
++        reg-names = "phy-ctl", "phy-clk";
++        #phy-cells = <1>;
++        clocks = <&ccu CLK_USB3_REF>, <&ccu CLK_PLL_PERIPH0_200M>;
++        clock-names = "phyclk_ref", "refclk_par";
++        resets = <&ccu RST_BUS_PCIE_USB3>;
++        reset-names = "phy_rst";
++    };
++...
+-- 
+Armbian

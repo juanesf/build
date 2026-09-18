@@ -1,0 +1,74 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Juan Sanchez <juanesf91@gmail.com>
+Date: Fri, 18 Sep 2026 19:55:00 -0500
+Subject: clk: sunxi-ng: a523: add USB2 PHY and USB3 suspend clocks
+
+Add the USB2 PHY clock gate (0x0A80) and the USB3 suspend clock
+(0x0A88, losc/hosc mux) to the A523 CCU, register the mbus USB3 gate
+and the new clocks in the clock data, and extend the binding header
+with their IDs. They feed the third USB2 PHY instance and the DWC3
+controller.
+
+Co-authored-by: opencode <noreply@opencode.ai>
+Signed-off-by: Juan Sanchez <juanesf91@gmail.com>
+---
+
+diff --git a/drivers/clk/sunxi-ng/ccu-sun55i-a523.c b/drivers/clk/sunxi-ng/ccu-sun55i-a523.c
+index e52bfeca9..902583869 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun55i-a523.c
++++ b/drivers/clk/sunxi-ng/ccu-sun55i-a523.c
+@@ -1218,6 +1218,19 @@ static SUNXI_CCU_M_DATA_WITH_MUX_GATE(usb3_ref_clk, "usb3-ref",
+ 		BIT(31),	/* gate */
+ 		0);
+ 
++static SUNXI_CCU_GATE(usb2_clk, "usb2", "hosc", 0x0A80, BIT(31), 0);
++
++static const struct clk_parent_data usb3_suspend_parents[] = {
++	{ .fw_name = "losc" },
++	{ .fw_name = "hosc" },
++};
++static SUNXI_CCU_M_DATA_WITH_MUX_GATE(usb3_suspend_clk, "usb3-suspend",
++		usb3_suspend_parents, 0x0A88,
++		0, 5,	/* M */
++		24, 1,	/* mux */
++		BIT(31),	/* gate */
++		0);
++
+ 
+ /*
+  * Contains all clocks that are controlled by a hardware register. They
+@@ -1389,6 +1402,8 @@ static struct ccu_common *sun55i_a523_ccu_clks[] = {
+ 	&fanout1_clk.common,
+ 	&fanout2_clk.common,
+ 	&usb3_ref_clk.common,
++	&usb2_clk.common,
++	&usb3_suspend_clk.common,
+ };
+ 
+ static struct clk_hw_onecell_data sun55i_a523_hw_clks = {
+@@ -1575,8 +1590,11 @@ static struct clk_hw_onecell_data sun55i_a523_hw_clks = {
+ 		[CLK_FANOUT2]		= &fanout2_clk.common.hw,
+ 		[CLK_NPU]		= &npu_clk.common.hw,
+ 		[CLK_USB3_REF]		= &usb3_ref_clk.common.hw,
++		[CLK_USB2]		= &usb2_clk.common.hw,
++		[CLK_USB3_SUSPEND]	= &usb3_suspend_clk.common.hw,
++		[CLK_MBUS_USB3]		= &mbus_usb3_clk.common.hw,
+ 	},
+-	.num	= CLK_HDMI + 1,
++	.num	= CLK_MBUS_USB3 + 1,
+ };
+ 
+ static struct ccu_reset_map sun55i_a523_ccu_resets[] = {
+diff --git a/include/dt-bindings/clock/sun55i-a523-ccu.h b/include/dt-bindings/clock/sun55i-a523-ccu.h
+index 2eca83f62..64acd6a63 100644
+--- a/include/dt-bindings/clock/sun55i-a523-ccu.h
++++ b/include/dt-bindings/clock/sun55i-a523-ccu.h
+@@ -188,5 +188,8 @@
+ #define CLK_NPU			179
+ #define CLK_USB3_REF		180
+ #define CLK_HDMI		181
++#define CLK_USB2		182
++#define CLK_USB3_SUSPEND	183
++#define CLK_MBUS_USB3		184
+ 
+ #endif /* _DT_BINDINGS_CLK_SUN55I_A523_CCU_H_ */

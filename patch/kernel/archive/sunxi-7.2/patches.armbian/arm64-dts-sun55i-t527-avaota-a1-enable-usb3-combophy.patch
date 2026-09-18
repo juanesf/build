@@ -1,0 +1,31 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Juan Sanchez <juanesf91@gmail.com>
+Date: Fri, 18 Sep 2026 19:55:00 -0500
+Subject: arm64: dts: allwinner: t527-avaota-a1: enable USB3
+
+Enable the combo PHY and the DWC3 controller. The board has no PCIe
+slot, so the lane is permanently wired to the USB3 port.
+
+Co-authored-by: opencode <noreply@opencode.ai>
+Signed-off-by: Juan Sanchez <juanesf91@gmail.com>
+---
+
+diff --git a/arch/arm64/boot/dts/allwinner/sun55i-t527-avaota-a1.dts b/arch/arm64/boot/dts/allwinner/sun55i-t527-avaota-a1.dts
+index ed78fe993..228a44308 100644
+--- a/arch/arm64/boot/dts/allwinner/sun55i-t527-avaota-a1.dts
++++ b/arch/arm64/boot/dts/allwinner/sun55i-t527-avaota-a1.dts
+@@ -586,6 +619,14 @@ &usbphy {
+ 	status = "okay";
+ };
+ 
++&combophy {
++	status = "okay";
++};
++
++&dwc3 {
++	status = "okay";
++};
++
+ &e906_rproc {
+ 	memory-region = <&rv_vdev0buffer>, <&rv_vdev0vring0>,
+ 			<&rv_vdev0vring1>, <&e906_dram_reserved>;

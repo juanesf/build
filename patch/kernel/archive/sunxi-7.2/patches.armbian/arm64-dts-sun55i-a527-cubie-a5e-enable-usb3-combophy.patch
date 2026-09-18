@@ -1,0 +1,56 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Juan Sanchez <juanesf91@gmail.com>
+Date: Fri, 18 Sep 2026 19:55:00 -0500
+Subject: arm64: dts: allwinner: a527-cubie-a5e: let U-Boot pick the combo PHY role
+
+The M.2 3V3 rail goes through the GMA340 analog switch (SEL on PB6):
+chain reg_pcie_vcc3v3 to the gma340_pcie mux input with vin-supply and
+drop the always-on/boot-on flags so the rail follows the mux, and drop
+phy_use_sel (the lane user is selected through the consumer phy-cell).
+U-Boot picks the role at boot time (NVMe present -> PCIe, otherwise
+USB3) and patches the status of the unused controller node.
+
+Co-authored-by: opencode <noreply@opencode.ai>
+Signed-off-by: Juan Sanchez <juanesf91@gmail.com>
+---
+
+diff --git a/arch/arm64/boot/dts/allwinner/sun55i-a527-cubie-a5e.dts b/arch/arm64/boot/dts/allwinner/sun55i-a527-cubie-a5e.dts
+index 879b3abac..1f1091060 100644
+--- a/arch/arm64/boot/dts/allwinner/sun55i-a527-cubie-a5e.dts
++++ b/arch/arm64/boot/dts/allwinner/sun55i-a527-cubie-a5e.dts
+@@ -161,8 +194,7 @@ reg_pcie_vcc3v3: regulator-pcie-vcc3v3 {
+ 		regulator-min-microvolt = <3300000>;
+ 		regulator-max-microvolt = <3300000>;
+ 		regulator-enable-ramp-delay = <1000>;
+-		regulator-always-on;
+-		regulator-boot-on;
++		vin-supply = <&gma340_pcie>;
+ 		gpio = <&r_pio 0 11 GPIO_ACTIVE_HIGH>;
+ 		enable-active-high;
+ 	};
+@@ -182,8 +214,6 @@ gma340_pcie: gma340-pcie {
+ 		regulator-name = "gma340-pcie";
+ 		regulator-min-microvolt = <3300000>;
+ 		regulator-max-microvolt = <3300000>;
+-		regulator-always-on;
+-		regulator-boot-on;
+ 		gpio = <&pio 1 6 GPIO_ACTIVE_HIGH>;
+ 		enable-active-high;
+ 	};
+@@ -566,10 +596,15 @@ &usbphy {
+ /* PCIE and USB Switch */
+ &combophy {
+ 	resets = <&ccu RST_BUS_PCIE_USB3>;
+-	phy_use_sel = <0>; /* 0:PCIE; 1:USB3 */
+ 	status = "okay";
+ };
+ 
++/*
++ * The combo PHY is shared between the M.2/PCIe slot and the USB3 port,
++ * muxed by the GMA340 (SEL on PB6). U-Boot picks PCIe when an NVMe/PCIe
++ * endpoint is present, otherwise USB3, and patches the status of the
++ * corresponding node before booting Linux.
++ */
+ &pcie {
+ 	reset-gpios = <&pio 7 11 GPIO_ACTIVE_HIGH>;
+ 	wake-gpios = <&pio 7 12 GPIO_ACTIVE_HIGH>;

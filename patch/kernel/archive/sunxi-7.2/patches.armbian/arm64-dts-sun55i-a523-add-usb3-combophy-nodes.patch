@@ -1,0 +1,90 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Juan Sanchez <juanesf91@gmail.com>
+Date: Fri, 18 Sep 2026 19:55:00 -0500
+Subject: arm64: dts: allwinner: a523: add USB3 combo PHY and DWC3 nodes
+
+Extend the USB PHY node with the pmu2 region, clock and reset of the
+third USB2 PHY. Switch the combo PHY node to the new
+allwinner,sun55i-a523-combophy compatible and drop the phy_refclk_sel
+property: the lane user is now selected by the consumer through the
+phy-cell argument. Add the DWC3 controller node, disabled by default.
+
+Co-authored-by: opencode <noreply@opencode.ai>
+Signed-off-by: Juan Sanchez <juanesf91@gmail.com>
+---
+
+diff --git a/arch/arm64/boot/dts/allwinner/sun55i-a523.dtsi b/arch/arm64/boot/dts/allwinner/sun55i-a523.dtsi
+index 231fc40e5..f784125df 100644
+--- a/arch/arm64/boot/dts/allwinner/sun55i-a523.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun55i-a523.dtsi
+@@ -1051,18 +1052,24 @@ usbphy: phy@4100400 {
+ 				     "allwinner,sun20i-d1-usb-phy";
+ 			reg = <0x4100400 0x100>,
+ 			      <0x4101800 0x100>,
+-			      <0x4200800 0x100>;
++			      <0x4200800 0x100>,
++			      <0x4e00000 0x100>;
+ 			reg-names = "phy_ctrl",
+ 				    "pmu0",
+-				    "pmu1";
++				    "pmu1",
++				    "pmu2";
+ 			clocks = <&osc24M>,
+-				 <&osc24M>;
++				 <&osc24M>,
++				 <&ccu CLK_USB2>;
+ 			clock-names = "usb0_phy",
+-				      "usb1_phy";
++				      "usb1_phy",
++				      "usb2_phy";
+ 			resets = <&ccu RST_USB_PHY0>,
+-				 <&ccu RST_USB_PHY1>;
++				 <&ccu RST_USB_PHY1>,
++				 <&ccu RST_BUS_3>;
+ 			reset-names = "usb0_reset",
+-				      "usb1_reset";
++				      "usb1_reset",
++				      "usb2_reset";
+ 			status = "disabled";
+ 			#phy-cells = <1>;
+ 		};
+@@ -1199,10 +1206,9 @@ usbc1: usbc1@11 {
+ 		};
+ 
+ 		combophy: phy@4f00000 {
+-			compatible = "allwinner,inno-combphy";
++			compatible = "allwinner,sun55i-a523-combophy";
+ 			reg = <0x04f00000 0x80000>, /* Sub-System Application Registers */
+ 				  <0x04f80000 0x80000>; /* Combo INNO PHY Registers */
+ 			reg-names = "phy-ctl", "phy-clk";
+ 			power-domains = <&pck600 PD_PCIE>;
+-			phy_refclk_sel = <0>; /* 0:internal clk; 1:external clk */
+ 			clocks = <&ccu CLK_USB3_REF>, <&ccu CLK_PLL_PERIPH0_200M>;
+@@ -1213,6 +1219,27 @@ combophy: phy@4f00000 {
+ 			status = "disabled";
+ 		};
+ 
++		dwc3: usb@4d00000 {
++			compatible = "snps,dwc3";
++			reg = <0x04d00000 0x100000>;
++			interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_MBUS_USB3>,
++				 <&ccu CLK_USB3_REF>,
++				 <&ccu CLK_USB3_SUSPEND>;
++			clock-names = "bus_early", "ref", "suspend";
++			dr_mode = "host";
++			maximum-speed = "super-speed";
++			phys = <&usbphy 2>, <&combophy PHY_TYPE_USB3>;
++			phy-names = "usb2-phy", "usb3-phy";
++			snps,dis_enblslpm_quirk;
++			snps,dis-u1-entry-quirk;
++			snps,dis-u2-entry-quirk;
++			snps,dis_u2_susphy_quirk;
++			snps,dis_u3_susphy_quirk;
++			snps,dis_rxdet_inp3_quirk;
++			status = "disabled";
++		};
++
+ 		pcie: pcie@4800000 {
+ 			compatible = "allwinner,sunxi-pcie-v210-rc";
+ 			#address-cells = <3>;

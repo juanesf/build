@@ -1,0 +1,104 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Juan Sanchez <juanesf91@gmail.com>
+Date: Fri, 18 Sep 2026 19:55:00 -0500
+Subject: board: sunxi: pick the Cubie A5E combo PHY role at boot time
+
+The Cubie A5E shares the A523 combo PHY lane between the M.2 slot and
+the USB3 port through a GMA340 analog switch (SEL on PB6). Scan the PCI
+bus during the device tree fixup: if an NVMe endpoint is found keep the
+lane routed to PCIe and disable the dwc3 node, otherwise route it to
+USB3 and disable the PCIe node instead. The "combophy_mode" environment
+variable ("pcie" or "usb3") overrides the automatic detection.
+
+The fixup is only compiled when the sun55i PCIe controller is enabled,
+so boards without PCIe (e.g. Avaota A1) are unaffected.
+
+Co-authored-by: opencode <noreply@opencode.ai>
+Signed-off-by: Juan Sanchez <juanesf91@gmail.com>
+---
+ board/sunxi/board.c | 55 +++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 55 insertions(+)
+
+diff --git a/board/sunxi/board.c b/board/sunxi/board.c
+index 111111111111..222222222222 100644
+--- a/board/sunxi/board.c
++++ b/board/sunxi/board.c
+@@ -47,6 +47,8 @@
+ #include <fdt_support.h>
+ #include <nand.h>
+ #include <net.h>
++#include <pci.h>
++#include <pci_ids.h>
+ #include <spl.h>
+ #include <sy8106a.h>
+ #include <asm/setup.h>
+@@ -988,6 +990,54 @@
+ 	}
+ }
+ 
++#if defined(CONFIG_MACH_SUN55I_A523) && defined(CONFIG_PCI) && \
++	defined(CONFIG_PCIE_SUN55I_RC)
++/*
++ * On the Radxa Cubie A5E the A523 combo PHY is shared between the PCIe
++ * controller (M.2 slot) and the USB3 port through a GMA340 analog mux
++ * (SEL: 0 = USB3, 1 = PCIe).
++ *
++ * Probe the PCIe bus: if an NVMe controller is present the lane is kept
++ * routed to PCIe for the M.2 slot, otherwise it is routed to USB3 and the
++ * DWC3 controller is enabled in the kernel device tree. The choice can be
++ * overridden with the "combophy_mode" environment variable ("pcie" or
++ * "usb3"), which allows a boot script to force a mode.
++ */
++static void cubie_a5e_combophy_fixup(void *blob)
++{
++	struct udevice *dev;
++	const char *mode;
++	bool pcie;
++	int gpio;
++
++	if (fdt_node_check_compatible(gd->fdt_blob, 0, "radxa,cubie-a5e"))
++		return;
++
++	mode = env_get("combophy_mode");
++	if (mode && !strcmp(mode, "pcie")) {
++		pcie = true;
++	} else if (mode && !strcmp(mode, "usb3")) {
++		pcie = false;
++	} else {
++		pcie = !pci_init() &&
++		       !dm_pci_find_class(PCI_CLASS_STORAGE_EXPRESS, 0, &dev);
++		env_set("combophy_mode", pcie ? "pcie" : "usb3");
++	}
++
++	/* GMA340 SEL: 1 = PCIe (M.2 slot), 0 = USB3 port. */
++	gpio = sunxi_name_to_gpio("PB6");
++	if (gpio >= 0)
++		gpio_direction_output(gpio, pcie);
++
++	fdt_set_status_by_compatible(blob, "allwinner,sun55i-pcie-v210-rc",
++				     pcie ? FDT_STATUS_OKAY : FDT_STATUS_DISABLED);
++	fdt_set_status_by_compatible(blob, "snps,dwc3",
++				     pcie ? FDT_STATUS_DISABLED : FDT_STATUS_OKAY);
++
++	printf("Cubie A5E: combo PHY routed to %s\n", pcie ? "PCIe" : "USB3");
++}
++#endif
++
+ int ft_board_setup(void *blob, struct bd_info *bd)
+ {
+ 	int __maybe_unused r;
+@@ -1003,6 +1053,11 @@
+ 	bluetooth_dt_fixup(blob);
+ 	board_dt_fixup(blob);
+ 
++#if defined(CONFIG_MACH_SUN55I_A523) && defined(CONFIG_PCI) && \
++	defined(CONFIG_PCIE_SUN55I_RC)
++	cubie_a5e_combophy_fixup(blob);
++#endif
++
+ #ifdef CONFIG_VIDEO_DT_SIMPLEFB
+ 	r = sunxi_simplefb_setup(blob);
+ 	if (r)
+-- 
+Armbian
+

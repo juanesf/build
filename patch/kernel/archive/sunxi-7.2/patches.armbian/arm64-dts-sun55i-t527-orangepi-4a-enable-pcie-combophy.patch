@@ -5,20 +5,19 @@ Subject: arm64: dts: allwinner: t527-orangepi-4a: enable PCIe combophy
 
 Signed-off-by: Marvin Wewer <mwewer37@proton.me>
 ---
- arch/arm64/boot/dts/allwinner/sun55i-t527-orangepi-4a.dts | 15 ++++++++++
- 1 file changed, 15 insertions(+)
+ arch/arm64/boot/dts/allwinner/sun55i-t527-orangepi-4a.dts | 14 ++++++++++
+ 1 file changed, 14 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/allwinner/sun55i-t527-orangepi-4a.dts b/arch/arm64/boot/dts/allwinner/sun55i-t527-orangepi-4a.dts
 index 111111111111..222222222222 100644
 --- a/arch/arm64/boot/dts/allwinner/sun55i-t527-orangepi-4a.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun55i-t527-orangepi-4a.dts
-@@ -439,6 +439,21 @@ bluetooth {
+@@ -439,6 +439,20 @@ bluetooth {
  	};
  };
  
 +&combophy {
-+       resets = <&ccu RST_BUS_PCIE_USB3>;
-+    	phy_use_sel = <0>;
++	resets = <&ccu RST_BUS_PCIE_USB3>;
 +	status = "okay";
 +};
 +
