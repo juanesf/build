@@ -350,28 +350,6 @@ index b239d49..6bf3f96 100644
  };
  
  &ehci0 {
-@@ -128,8 +180,8 @@
- 	phy-handle = <&ext_rgmii0_phy>;
- 	phy-supply = <&reg_cldo3>;
- 
--	allwinner,tx-delay-ps = <300>;
--	allwinner,rx-delay-ps = <400>;
-+	allwinner,tx-delay-ps = <0>;
-+	allwinner,rx-delay-ps = <300>;
- 
- 	status = "okay";
- };
-@@ -139,8 +191,8 @@
- 	phy-handle = <&ext_rgmii1_phy>;
- 	phy-supply = <&reg_cldo4>;
- 
--	tx-internal-delay-ps = <300>;
--	rx-internal-delay-ps = <400>;
-+	tx-internal-delay-ps = <0>;
-+	rx-internal-delay-ps = <300>;
- 
- 	status = "okay";
- };
 @@ -275,6 +327,7 @@
  			};
  
@@ -457,26 +435,6 @@ index 3bcd11e..44ed729 100644
  };
  
  &ehci0 {
-@@ -123,7 +147,7 @@
- 	phy-handle = <&ext_rgmii0_phy>;
- 	phy-supply = <&reg_dcdc4>;
- 
--	allwinner,tx-delay-ps = <100>;
-+	allwinner,tx-delay-ps = <0>;
- 	allwinner,rx-delay-ps = <300>;
- 
- 	status = "okay";
-@@ -134,8 +158,8 @@
- 	phy-handle = <&ext_rgmii1_phy>;
- 	phy-supply = <&reg_dcdc4>;
- 
--	tx-internal-delay-ps = <100>;
--	rx-internal-delay-ps = <100>;
-+	tx-internal-delay-ps = <0>;
-+	rx-internal-delay-ps = <300>;
- 
- 	status = "okay";
- };
 @@ -567,3 +567,18 @@
  			<&rv_vdev0vring1>, <&e906_dram_reserved>;
  	status = "okay";
