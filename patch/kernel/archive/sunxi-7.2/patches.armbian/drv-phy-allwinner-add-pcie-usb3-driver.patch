@@ -42,7 +42,7 @@ new file mode 100644
 index 000000000000..111111111111 100644
 --- /dev/null
 +++ b/drivers/phy/allwinner/phy-sun55i-combophy.c
-@@ -0,0 +1,520 @@
+@@ -0,0 +1,534 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * Allwinner A523/T527 Innosilicon USB3.0/PCIe combo PHY driver
@@ -458,6 +458,20 @@ index 000000000000..111111111111 100644
 +			 args->args[0], priv->mode);
 +
 +	priv->mode = args->args[0];
++
++	/*
++	 * The consumer's register block sits behind its sub-system bus
++	 * gate: open it as soon as a consumer attaches, before it
++	 * touches any register. The DWC3 host driver for instance reads
++	 * its IP ID register during probe, before powering the PHY on,
++	 * and gets garbage unless USB3_BGR is set.
++	 */
++	if (args->args[0] == PHY_TYPE_USB3)
++		sun55i_combphy_rmw(priv->ctl + USB3_BGR, 0,
++				   USB3_BGR_ENABLE_MASK);
++	else
++		sun55i_combphy_rmw(priv->ctl + PCIE_BGR, 0,
++				   PCIE_BGR_ENABLE_MASK);
 +
 +	return priv->phy;
 +}
