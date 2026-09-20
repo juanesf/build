@@ -42,7 +42,7 @@ new file mode 100644
 index 000000000000..111111111111 100644
 --- /dev/null
 +++ b/drivers/phy/allwinner/phy-sun55i-combophy.c
-@@ -0,0 +1,534 @@
+@@ -0,0 +1,541 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * Allwinner A523/T527 Innosilicon USB3.0/PCIe combo PHY driver
@@ -440,6 +440,7 @@ index 000000000000..111111111111 100644
 +					const struct of_phandle_args *args)
 +{
 +	struct sun55i_combphy *priv = dev_get_drvdata(dev);
++	int ret;
 +
 +	if (args->args_count != 1)
 +		return ERR_PTR(-EINVAL);
@@ -460,12 +461,18 @@ index 000000000000..111111111111 100644
 +	priv->mode = args->args[0];
 +
 +	/*
-+	 * The consumer's register block sits behind its sub-system bus
-+	 * gate: open it as soon as a consumer attaches, before it
-+	 * touches any register. The DWC3 host driver for instance reads
-+	 * its IP ID register during probe, before powering the PHY on,
-+	 * and gets garbage unless USB3_BGR is set.
++	 * The whole combo sub-system (PHY, controller register files and
++	 * sub-system application registers) sits behind PCIE_USB3_SYS_RST,
++	 * which is asserted at boot, and behind its per-mode sub-system
++	 * bus gate. The DWC3 host driver for instance reads its IP ID
++	 * register during probe, before powering the PHY on, and gets
++	 * garbage unless both are released already. Bring the sub-system
++	 * out of reset and open the bus gate of the requested consumer.
 +	 */
++	ret = reset_control_deassert(priv->reset);
++	if (ret)
++		return ERR_PTR(ret);
++
 +	if (args->args[0] == PHY_TYPE_USB3)
 +		sun55i_combphy_rmw(priv->ctl + USB3_BGR, 0,
 +				   USB3_BGR_ENABLE_MASK);
