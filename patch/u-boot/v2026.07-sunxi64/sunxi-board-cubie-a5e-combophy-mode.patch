@@ -17,7 +17,7 @@ Co-authored-by: opencode <noreply@opencode.ai>
 Signed-off-by: Juan Sanchez <juanesf91@gmail.com>
 ---
  board/sunxi/board.c | 55 +++++++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 55 insertions(+)
+ 1 file changed, 60 insertions(+)
 
 diff --git a/board/sunxi/board.c b/board/sunxi/board.c
 index 111111111111..222222222222 100644
@@ -32,7 +32,7 @@ index 111111111111..222222222222 100644
  #include <spl.h>
  #include <sy8106a.h>
  #include <asm/setup.h>
-@@ -988,6 +990,54 @@
+@@ -988,6 +990,59 @@
  	}
  }
  
@@ -74,6 +74,11 @@ index 111111111111..222222222222 100644
 +	gpio = sunxi_name_to_gpio("PB6");
 +	if (gpio >= 0)
 +		gpio_direction_output(gpio, pcie);
++
++	/* GMA340 OE#: keep the analog mux enabled (active low). */
++	gpio = sunxi_name_to_gpio("PB7");
++	if (gpio >= 0)
++		gpio_direction_output(gpio, 0);
 +
 +	fdt_set_status_by_compatible(blob, "allwinner,sunxi-pcie-v210-rc",
 +				     pcie ? FDT_STATUS_OKAY : FDT_STATUS_DISABLED);
