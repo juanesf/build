@@ -42,7 +42,7 @@ new file mode 100644
 index 000000000000..111111111111 100644
 --- /dev/null
 +++ b/drivers/phy/allwinner/phy-sun55i-combophy.c
-@@ -0,0 +1,537 @@
+@@ -0,0 +1,542 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * Allwinner A523/T527 Innosilicon USB3.0/PCIe combo PHY driver
@@ -81,9 +81,10 @@ index 000000000000..111111111111 100644
 +#define USB3_BGR			0x08
 +#define  USB3_ACLK_EN			BIT(17)
 +#define  USB3_HCLK_EN			BIT(16)
++#define  USB3_PERSTN			BIT(1)
 +#define  USB3_RESETN			BIT(0)
 +#define  USB3_BGR_ENABLE_MASK		(USB3_ACLK_EN | USB3_HCLK_EN | \
-+					 USB3_RESETN)
++					 USB3_PERSTN | USB3_RESETN)
 +
 +#define PHYCTL				0x10
 +#define  PHY_USE_SEL			BIT(31)	/* 0: PCIe, 1: USB3 */
@@ -263,10 +264,14 @@ index 000000000000..111111111111 100644
 +	sun55i_combphy_rmw(priv->ctl + PHYCTL, clear, set);
 +
 +	/* Bus gating and power-up resets of the selected sub-system. */
-+	if (priv->mode == PHY_TYPE_USB3)
++	if (priv->mode == PHY_TYPE_USB3) {
 +		sun55i_combphy_rmw(priv->ctl + USB3_BGR, 0, USB3_BGR_ENABLE_MASK);
-+	else
++		dev_info(priv->dev, "usb3: BGR=%#x PHYCTL=%#x\n",
++			 readl(priv->ctl + USB3_BGR),
++			 readl(priv->ctl + PHYCTL));
++	} else {
 +		sun55i_combphy_rmw(priv->ctl + PCIE_BGR, 0, PCIE_BGR_ENABLE_MASK);
++	}
 +}
 +
 +/* Assert the PHY reset and gate the bus clocks of the used sub-system. */
