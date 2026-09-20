@@ -75,7 +75,7 @@ index 111111111111..222222222222 100644
 +	if (gpio >= 0)
 +		gpio_direction_output(gpio, pcie);
 +
-+	fdt_set_status_by_compatible(blob, "allwinner,sun55i-pcie-v210-rc",
++	fdt_set_status_by_compatible(blob, "allwinner,sunxi-pcie-v210-rc",
 +				     pcie ? FDT_STATUS_OKAY : FDT_STATUS_DISABLED);
 +	fdt_set_status_by_compatible(blob, "snps,dwc3",
 +				     pcie ? FDT_STATUS_DISABLED : FDT_STATUS_OKAY);
