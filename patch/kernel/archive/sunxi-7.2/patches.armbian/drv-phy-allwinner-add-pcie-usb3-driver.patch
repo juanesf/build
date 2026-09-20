@@ -42,7 +42,7 @@ new file mode 100644
 index 000000000000..111111111111 100644
 --- /dev/null
 +++ b/drivers/phy/allwinner/phy-sun55i-combophy.c
-@@ -0,0 +1,542 @@
+@@ -0,0 +1,570 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * Allwinner A523/T527 Innosilicon USB3.0/PCIe combo PHY driver
@@ -496,7 +496,7 @@ index 000000000000..111111111111 100644
 +		return -ENOMEM;
 +
 +	priv->dev = dev;
-+	priv->mode = PHY_NONE;
++	priv->mode = PHY_TYPE_USB3;
 +
 +	priv->ctl = devm_platform_ioremap_resource_byname(pdev, "phy-ctl");
 +	if (IS_ERR(priv->ctl))
@@ -525,6 +525,34 @@ index 000000000000..111111111111 100644
 +	if (IS_ERR(priv->reset))
 +		return dev_err_probe(dev, PTR_ERR(priv->reset),
 +				     "failed to get phy_rst reset\n");
++
++	/*
++	 * The DWC3 and PCIe cores read their IP ID/DBI registers during
++	 * probe, before they request the PHY through the provider, and the
++	 * whole combo sub-system sits behind the PCIE_USB3_SYS_RST reset and
++	 * the per-sub-system bus gates in the sysctl block. Bring it up here
++	 * so both controllers see their register file alive regardless of
++	 * probe order; sun55i_combphy_xlate() later re-routes the lane to
++	 * the requesting consumer and switches the matching bus gate.
++	 */
++	ret = clk_prepare_enable(priv->ref_clk);
++	if (ret)
++		return dev_err_probe(dev, ret,
++				     "failed to enable phyclk_ref clock\n");
++
++	ret = reset_control_deassert(priv->reset);
++	if (ret)
++		return dev_err_probe(dev, ret,
++				     "failed to release combo sub-system reset\n");
++
++	sun55i_combphy_rmw(priv->ctl + PCIE_BGR, 0, PCIE_BGR_ENABLE_MASK);
++	sun55i_combphy_rmw(priv->ctl + USB3_BGR, 0, USB3_BGR_ENABLE_MASK);
++	sun55i_combphy_rmw(priv->ctl + PHYCTL, PHY_CLK_SEL, PHY_RSTN | PHY_USE_SEL);
++
++	dev_info(dev, "combo sub-system ready: PCIE_BGR=%#x USB3_BGR=%#x PHYCTL=%#x\n",
++		 readl(priv->ctl + PCIE_BGR),
++		 readl(priv->ctl + USB3_BGR),
++		 readl(priv->ctl + PHYCTL));
 +
 +	priv->phy = devm_phy_create(dev, NULL, &sun55i_combphy_ops);
 +	if (IS_ERR(priv->phy))
