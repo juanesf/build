@@ -1,0 +1,70 @@
+From bd84ec7fa84f377289e8f5ddd1880545d3dc8cca Mon Sep 17 00:00:00 2001
+From: Jernej Skrabec <jernej.skrabec@gmail.com>
+Date: Sat, 23 May 2026 10:55:59 +0000
+Subject: [PATCH] drm/sun4i: edp: Turn on the regulators when bringing the
+ controller up
+
+The optional vdd / vcc rails feed the analog block and the
+AUX/HPD pads. Enable them before deasserting the reset and turn them
+back off in the disable path. Without this the AUX channel and HPD
+pins on boards that gate these rails do not work.
+
+Signed-off-by: Jernej Skrabec <jernej.skrabec@gmail.com>
+---
+ drivers/gpu/drm/sun4i/sun55i_edp.c | 24 +++++++++++++++++++++++-
+ 1 file changed, 23 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/sun4i/sun55i_edp.c b/drivers/gpu/drm/sun4i/sun55i_edp.c
+index c481f8e3dc5f..083fe2dda441 100644
+--- a/drivers/gpu/drm/sun4i/sun55i_edp.c
++++ b/drivers/gpu/drm/sun4i/sun55i_edp.c
+@@ -281,9 +281,21 @@ static int sun55i_edp_hw_enable(struct sun55i_edp *edp)
+ {
+ 	int ret;
+ 
++	if (edp->vdd_supply) {
++		ret = regulator_enable(edp->vdd_supply);
++		if (ret)
++			return ret;
++	}
++
++	if (edp->vcc_supply) {
++		ret = regulator_enable(edp->vcc_supply);
++		if (ret)
++			goto err_disable_vdd;
++	}
++
+ 	ret = reset_control_deassert(edp->rst_bus);
+ 	if (ret)
+-		return ret;
++		goto err_disable_vcc;
+ 
+ 	ret = clk_prepare_enable(edp->clk_bus);
+ 	if (ret)
+@@ -307,6 +319,12 @@ static int sun55i_edp_hw_enable(struct sun55i_edp *edp)
+ 	clk_disable_unprepare(edp->clk_bus);
+ err_assert_reset:
+ 	reset_control_assert(edp->rst_bus);
++err_disable_vcc:
++	if (edp->vcc_supply)
++		regulator_disable(edp->vcc_supply);
++err_disable_vdd:
++	if (edp->vdd_supply)
++		regulator_disable(edp->vdd_supply);
+ 	return ret;
+ }
+ 
+@@ -317,6 +335,10 @@ static void sun55i_edp_hw_disable(struct sun55i_edp *edp)
+ 	clk_disable_unprepare(edp->clk_mod);
+ 	clk_disable_unprepare(edp->clk_bus);
+ 	reset_control_assert(edp->rst_bus);
++	if (edp->vcc_supply)
++		regulator_disable(edp->vcc_supply);
++	if (edp->vdd_supply)
++		regulator_disable(edp->vdd_supply);
+ }
+ 
+ static void sun55i_edp_hpd_enable(struct sun55i_edp *edp)
+-- 
+2.53.0
+

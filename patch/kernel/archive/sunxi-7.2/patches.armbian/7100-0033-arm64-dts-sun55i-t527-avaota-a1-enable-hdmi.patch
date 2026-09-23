@@ -1,0 +1,89 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Armbian <armbian@localhost>
+Date: Tue, 22 Sep 2026 22:50:00 -0300
+Subject: [PATCH] arm64: dts: allwinner: t527: Enable HDMI on Avaota A1
+
+Now that the A523 display pipeline is wired up, enable the HDMI output on
+the Avaota A1 by adding an HDMI connector, pinning the CMA pool low for the
+DE fetch aperture and wiring the HDMI PHY supply, following the Radxa Cubie
+A5E example.
+
+Signed-off-by: Armbian <armbian@localhost>
+---
+ arch/arch/arm64/boot/dts/allwinner/sun55i-t527-avaota-a1.dts | 70 ++++-----
+ 1 file changed
+
+diff --git a/arch/arm64/boot/dts/allwinner/sun55i-t527-avaota-a1.dts b/arch/arm64/boot/dts/allwinner/sun55i-t527-avaota-a1.dts
+index e2b6cc0c8121967fa7522ca9687f25ac5260b6af..e4d27499311cd5255b2d0c0d0f31faf749b22aba 100644
+--- a/arch/arm64/boot/dts/allwinner/sun55i-t527-avaota-a1.dts
++++ b/arch/arm64/boot/dts/allwinner/sun55i-t527-avaota-a1.dts
+@@ -24,6 +24,17 @@
+ 		stdout-path = "serial0:115200n8";
+ 	};
+ 
++	hdmi-connector {
++		compatible = "hdmi-connector";
++		type = "a";
++
++		port {
++			hdmi_con_in: endpoint {
++				remote-endpoint = <&hdmi_out_con>;
++			};
++		};
++	};
++
+ 	reserved-memory {
+ 		#address-cells = <2>;
+ 		#size-cells = <2>;
+@@ -59,6 +70,19 @@
+ 			reg = <0x0 0x4ae42000 0x0 0x2000>;
+ 			no-map;
+ 		};
++
++		linux,cma {
++			compatible = "shared-dma-pool";
++			reusable;
++			/* pin low: the DE fetch aperture only reaches DRAM below
++			 * ~0x4b100000; stop at 0x48000000 to stay clear of the
++			 * secmon@48000000/48100000 and vdev@4ae00000 no-map
++			 * reservations (overlap hands out no-map pages -> oops) */
++			reg = <0x0 0x43000000 0x0 0x5000000>;
++			alloc-ranges = <0x0 0x43000000 0x0 0x5000000>;
++			size = <0x0 0x5000000>;
++			linux,cma-default;
++		};
+ 	};
+ 
+ 	ext_osc32k: ext-osc32k-clk {
+@@ -110,6 +134,10 @@
+ 	};
+ };
+ 
++&de {
++	status = "okay";
++};
++
+ &ehci0 {
+ 	status = "okay";
+ };
+@@ -145,6 +173,17 @@
+ 	status = "okay";
+ };
+ 
++&hdmi {
++	hvcc-supply = <&reg_bldo3>;
++	status = "okay";
++};
++
++&hdmi_out {
++	hdmi_out_con: endpoint {
++		remote-endpoint = <&hdmi_con_in>;
++	};
++};
++
+ &ir {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&ir_rx_pin>;
+
+-- 
+2.53.0

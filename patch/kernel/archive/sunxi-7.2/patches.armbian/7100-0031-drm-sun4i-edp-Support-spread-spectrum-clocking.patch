@@ -1,0 +1,143 @@
+From 7d672222a14e885b40adeb0e9d0d5c5a29f8cec5 Mon Sep 17 00:00:00 2001
+From: Jernej Skrabec <jernej.skrabec@gmail.com>
+Date: Sat, 23 May 2026 12:03:28 +0000
+Subject: [PATCH] drm/sun4i: edp: Support spread-spectrum clocking
+
+When the sink advertises MAX_DOWNSPREAD support in DPCD 0x00003,
+flip the core PLL's SSC bypass off (and let the fractional divider
+run) so the link clock is modulated by the controller's built-in
+0.5% downspread. The sink is asked to follow suit through
+DP_DOWNSPREAD_CTRL.
+
+A new allwinner,ssc-disable DT property lets a board force SSC off
+even if both ends would otherwise agree to it, for setups where
+downspread causes EMI mitigation or interoperability problems.
+
+Signed-off-by: Jernej Skrabec <jernej.skrabec@gmail.com>
+---
+ .../display/allwinner,sun55i-a523-edp.yaml    |  8 +++++
+ drivers/gpu/drm/sun4i/sun55i_edp.c            | 33 +++++++++++++++++++
+ 2 files changed, 41 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/display/allwinner,sun55i-a523-edp.yaml b/Documentation/devicetree/bindings/display/allwinner,sun55i-a523-edp.yaml
+index fd368187097a..08538c96da91 100644
+--- a/Documentation/devicetree/bindings/display/allwinner,sun55i-a523-edp.yaml
++++ b/Documentation/devicetree/bindings/display/allwinner,sun55i-a523-edp.yaml
+@@ -67,6 +67,14 @@ properties:
+             attenuation.
+         2 - wide swing (200-500 mV), covers both.
+ 
++  allwinner,ssc-disable:
++    type: boolean
++    description: |
++      Force spread-spectrum clocking off even if the sink
++      advertises support for it. Useful on boards where downspread
++      causes interoperability problems with the attached panel or
++      cable.
++
+   ports:
+     $ref: /schemas/graph.yaml#/properties/ports
+ 
+diff --git a/drivers/gpu/drm/sun4i/sun55i_edp.c b/drivers/gpu/drm/sun4i/sun55i_edp.c
+index 6498d4165910..508caac7404e 100644
+--- a/drivers/gpu/drm/sun4i/sun55i_edp.c
++++ b/drivers/gpu/drm/sun4i/sun55i_edp.c
+@@ -60,6 +60,7 @@
+ #define  SUN55I_EDP_ANA_PLL_FRAC_PD	GENMASK(5, 4)
+ #define  SUN55I_EDP_ANA_PLL_PREDIV	GENMASK(13, 8)
+ #define  SUN55I_EDP_ANA_PLL_FBDIV_H4	GENMASK(19, 16)
++#define  SUN55I_EDP_ANA_PLL_SSC_BYPASS	BIT(21)
+ #define  SUN55I_EDP_ANA_PLL_FBDIV_L8	GENMASK(31, 24)
+ #define SUN55I_EDP_ANA_PLL_FRAC		0x0184
+ #define  SUN55I_EDP_ANA_PLL_FRAC_H8	GENMASK(7, 0)
+@@ -200,6 +201,7 @@ struct sun55i_edp {
+ 
+ 	/* Training swing/pre-emphasis variant (0 = low, 1 = high, 2 = wide). */
+ 	u8			train_param;
++	bool			ssc_disabled;
+ 
+ 	struct work_struct	hpd_work;
+ 
+@@ -341,6 +343,7 @@ static const struct sun55i_edp_pll_cfg sun55i_edp_pll_hbr;
+ static void sun55i_edp_aux_clock_setup(struct sun55i_edp *edp, u32 bit_mhz);
+ static void sun55i_edp_corepll_set(struct sun55i_edp *edp,
+ 				   const struct sun55i_edp_pll_cfg *cfg);
++static void sun55i_edp_ssc_set(struct sun55i_edp *edp, bool enable);
+ static int sun55i_edp_pixpll_set(struct sun55i_edp *edp, u32 pixel_khz);
+ 
+ /*
+@@ -625,6 +628,7 @@ static int sun55i_edp_link_train_at(struct sun55i_edp *edp, u8 link_rate,
+ 				    u8 lanes)
+ {
+ 	const struct sun55i_edp_pll_cfg *pll_cfg;
++	bool ssc;
+ 	u8 value;
+ 	int ret;
+ 
+@@ -633,6 +637,11 @@ static int sun55i_edp_link_train_at(struct sun55i_edp *edp, u8 link_rate,
+ 	sun55i_edp_aux_clock_setup(edp,
+ 				   link_rate == DP_LINK_BW_2_7 ? 1350 : 810);
+ 	sun55i_edp_corepll_set(edp, pll_cfg);
++
++	ssc = !edp->ssc_disabled &&
++	      (edp->dpcd[DP_MAX_DOWNSPREAD] & DP_MAX_DOWNSPREAD_0_5);
++	sun55i_edp_ssc_set(edp, ssc);
++
+ 	usleep_range(500, 1000);
+ 
+ 	sun55i_edp_train_set_rate(edp, link_rate);
+@@ -648,6 +657,11 @@ static int sun55i_edp_link_train_at(struct sun55i_edp *edp, u8 link_rate,
+ 	if (ret < 0)
+ 		return ret;
+ 
++	ret = drm_dp_dpcd_writeb(&edp->aux, DP_DOWNSPREAD_CTRL,
++				 ssc ? DP_SPREAD_AMP_0_5 : 0);
++	if (ret < 0)
++		return ret;
++
+ 	ret = sun55i_edp_link_train_cr(edp, lanes);
+ 	if (ret < 0)
+ 		goto out;
+@@ -1109,6 +1123,8 @@ static void sun55i_edp_corepll_set(struct sun55i_edp *edp,
+ 	val |= FIELD_PREP(SUN55I_EDP_ANA_PLL_FBDIV_H4, cfg->fbdiv_h4);
+ 	val |= FIELD_PREP(SUN55I_EDP_ANA_PLL_FBDIV_L8, cfg->fbdiv_l8);
+ 	val |= FIELD_PREP(SUN55I_EDP_ANA_PLL_FRAC_PD, cfg->frac_pd);
++	/* Default to SSC bypassed; sun55i_edp_ssc_set() flips it later. */
++	val |= SUN55I_EDP_ANA_PLL_SSC_BYPASS;
+ 	writel(val, edp->regs + SUN55I_EDP_ANA_PLL_FBDIV);
+ 
+ 	val = readl(edp->regs + SUN55I_EDP_ANA_PLL_POSDIV);
+@@ -1127,6 +1143,20 @@ static void sun55i_edp_corepll_set(struct sun55i_edp *edp,
+ 	writel(val, edp->regs + SUN55I_EDP_ANA_PLL_FBDIV);
+ }
+ 
++static void sun55i_edp_ssc_set(struct sun55i_edp *edp, bool enable)
++{
++	u32 val = readl(edp->regs + SUN55I_EDP_ANA_PLL_FBDIV);
++
++	val &= ~SUN55I_EDP_ANA_PLL_FRAC_PD;
++	if (enable) {
++		val &= ~SUN55I_EDP_ANA_PLL_SSC_BYPASS;
++	} else {
++		val |= FIELD_PREP(SUN55I_EDP_ANA_PLL_FRAC_PD, 0x3);
++		val |= SUN55I_EDP_ANA_PLL_SSC_BYPASS;
++	}
++	writel(val, edp->regs + SUN55I_EDP_ANA_PLL_FBDIV);
++}
++
+ struct sun55i_edp_pixpll {
+ 	u8 prediv;
+ 	u8 fbdiv_h4;
+@@ -1570,6 +1600,9 @@ static int sun55i_edp_probe(struct platform_device *pdev)
+ 		edp->train_param = 0;
+ 	}
+ 
++	edp->ssc_disabled = of_property_read_bool(dev->of_node,
++						  "allwinner,ssc-disable");
++
+ 	edp->vdd_supply = devm_regulator_get_optional(dev, "vdd");
+ 	if (IS_ERR(edp->vdd_supply)) {
+ 		if (PTR_ERR(edp->vdd_supply) == -EPROBE_DEFER)
+-- 
+2.53.0
+

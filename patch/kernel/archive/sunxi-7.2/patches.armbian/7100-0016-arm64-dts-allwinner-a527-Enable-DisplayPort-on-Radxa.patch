@@ -1,0 +1,65 @@
+From f47d06c1b54cf42f5ee67f849012613c645dfa99 Mon Sep 17 00:00:00 2001
+From: Jernej Skrabec <jernej.skrabec@gmail.com>
+Date: Sat, 23 May 2026 10:29:48 +0000
+Subject: [PATCH] arm64: dts: allwinner: a527: Enable DisplayPort on Radxa
+ Cubie A5E
+
+Add a DP connector node and wire it through the eDP encoder and
+TCON-TV1. The eDP controller is brought up via the
+allwinner,sun55i-a523-dp compatible inherited from the SoC dtsi.
+
+Note: link training / PHY programming in the eDP driver are still
+stubs, so actual DP output is not yet functional. Subsequent patches
+will add those.
+
+Signed-off-by: Jernej Skrabec <jernej.skrabec@gmail.com>
+---
+ .../dts/allwinner/sun55i-a527-cubie-a5e.dts   | 25 +++++++++++++++++++
+ 1 file changed, 25 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/allwinner/sun55i-a527-cubie-a5e.dts b/arch/arm64/boot/dts/allwinner/sun55i-a527-cubie-a5e.dts
+index 83e0f646fa7f..35c7a9f24c2e 100644
+--- a/arch/arm64/boot/dts/allwinner/sun55i-a527-cubie-a5e.dts
++++ b/arch/arm64/boot/dts/allwinner/sun55i-a527-cubie-a5e.dts
+@@ -34,6 +34,17 @@ hdmi_con_in: endpoint {
+ 		};
+ 	};
+ 
++	dp-connector {
++		compatible = "dp-connector";
++		type = "full-size";
++
++		port {
++			dp_con_in: endpoint {
++				remote-endpoint = <&edp_out_con>;
++			};
++		};
++	};
++
+ 	leds {
+ 		compatible = "gpio-leds";
+ 
+@@ -142,6 +153,20 @@ hdmi_out_con: endpoint {
+ 	};
+ };
+ 
++&edp {
++	status = "okay";
++};
++
++&edp_out {
++	edp_out_con: endpoint {
++		remote-endpoint = <&dp_con_in>;
++	};
++};
++
++&tcon_tv1 {
++	status = "okay";
++};
++
+ &mdio0 {
+ 	ext_rgmii0_phy: ethernet-phy@1 {
+ 		compatible = "ethernet-phy-ieee802.3-c22";
+-- 
+2.53.0
+

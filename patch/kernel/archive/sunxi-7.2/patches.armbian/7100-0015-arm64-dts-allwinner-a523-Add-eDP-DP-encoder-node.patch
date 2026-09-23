@@ -1,0 +1,72 @@
+From da567efc4b56eeef823c258f161cf4f80be6df8b Mon Sep 17 00:00:00 2001
+From: Jernej Skrabec <jernej.skrabec@gmail.com>
+Date: Sat, 23 May 2026 10:24:44 +0000
+Subject: [PATCH] arm64: dts: allwinner: a523: Add eDP/DP encoder node
+
+Add the eDP/DP TX controller at 0x05720000, fed by TCON-TV1. The node
+is left disabled at the dtsi level; boards opt in by switching its
+compatible between sun55i-a523-edp and sun55i-a523-dp (and providing
+a panel or DP connector graph) and by enabling &tcon_tv1 + &edp.
+
+Signed-off-by: Jernej Skrabec <jernej.skrabec@gmail.com>
+---
+ .../arm64/boot/dts/allwinner/sun55i-a523.dtsi | 36 +++++++++++++++++++
+ 1 file changed, 36 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/allwinner/sun55i-a523.dtsi b/arch/arm64/boot/dts/allwinner/sun55i-a523.dtsi
+index d74474fdd523..7cc256e4fb6b 100644
+--- a/arch/arm64/boot/dts/allwinner/sun55i-a523.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun55i-a523.dtsi
+@@ -1325,6 +1325,11 @@ tcon_tv1_out: port@1 {
+ 					#size-cells = <0>;
+ 					reg = <1>;
+ 
++					tcon_tv1_out_edp: endpoint@0 {
++						reg = <0>;
++						remote-endpoint = <&edp_in_tcon_tv1>;
++					};
++
+ 					tcon_tv1_out_tcon_top: endpoint@1 {
+ 						reg = <1>;
+ 						remote-endpoint = <&tcon_top_hdmi_in_tcon_tv1>;
+@@ -1333,6 +1338,37 @@ tcon_tv1_out_tcon_top: endpoint@1 {
+ 			};
+ 		};
+ 
++		edp: edp@5720000 {
++			compatible = "allwinner,sun55i-a523-dp";
++			reg = <0x5720000 0x4000>;
++			interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_EDP>,
++				 <&ccu CLK_EDP>,
++				 <&ccu CLK_HDMI_24M>;
++			clock-names = "bus", "mod", "24m";
++			resets = <&ccu RST_BUS_EDP>;
++			reset-names = "bus";
++			power-domains = <&pck600 PD_VO0>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				edp_in: port@0 {
++					reg = <0>;
++
++					edp_in_tcon_tv1: endpoint {
++						remote-endpoint = <&tcon_tv1_out_edp>;
++					};
++				};
++
++				edp_out: port@1 {
++					reg = <1>;
++				};
++			};
++		};
++
+ 		tcon_top1: tcon-top@5730000 {
+ 			compatible = "allwinner,sun55i-a523-tcon-top1";
+ 			reg = <0x5730000 0x1000>;
+-- 
+2.53.0
+

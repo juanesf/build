@@ -1,0 +1,44 @@
+From a3d0ca6066ed6dc047ccbf7e56f5e152fabae3a6 Mon Sep 17 00:00:00 2001
+From: Jernej Skrabec <jernej.skrabec@gmail.com>
+Date: Fri, 22 May 2026 16:39:26 +0000
+Subject: [PATCH] drm/sun4i: mixer: Add A523 mixer compatible
+
+Allwinner A523/A527/T527 Display Engine 3.5 shares the DE 3.3 mixer
+register layout, so reuse the SUN8I_MIXER_DE33 type for the new
+compatible.
+
+Signed-off-by: Jernej Skrabec <jernej.skrabec@gmail.com>
+---
+ drivers/gpu/drm/sun4i/sun8i_mixer.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+index af6e6bc1faff..e1602f2fbd8d 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
++++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+@@ -987,6 +987,11 @@ static const struct sun8i_mixer_cfg sun50i_h616_mixer0_cfg = {
+ 	.mod_rate	= 600000000,
+ };
+ 
++static const struct sun8i_mixer_cfg sun55i_a523_mixer0_cfg = {
++	.de_type	= SUN8I_MIXER_DE33,
++	.mod_rate	= 600000000,
++};
++
+ static const struct of_device_id sun8i_mixer_of_table[] = {
+ 	{
+ 		.compatible = "allwinner,sun8i-a83t-de2-mixer-0",
+@@ -1040,6 +1045,10 @@ static const struct of_device_id sun8i_mixer_of_table[] = {
+ 		.compatible = "allwinner,sun50i-h616-de33-mixer-0",
+ 		.data = &sun50i_h616_mixer0_cfg,
+ 	},
++	{
++		.compatible = "allwinner,sun55i-a523-de35-mixer-0",
++		.data = &sun55i_a523_mixer0_cfg,
++	},
+ 	{ }
+ };
+ MODULE_DEVICE_TABLE(of, sun8i_mixer_of_table);
+-- 
+2.53.0
+

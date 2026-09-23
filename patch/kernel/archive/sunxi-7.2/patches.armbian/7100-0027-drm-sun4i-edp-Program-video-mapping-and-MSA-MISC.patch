@@ -1,0 +1,79 @@
+From c2c20c382e718b26f3af3868e83fa8c804672517 Mon Sep 17 00:00:00 2001
+From: Jernej Skrabec <jernej.skrabec@gmail.com>
+Date: Sat, 23 May 2026 11:19:26 +0000
+Subject: [PATCH] drm/sun4i: edp: Program video mapping and MSA MISC
+
+Tell the controller which input format the TCON feeds it and the
+sink which colour space / bit depth it should expect.
+
+Only the 24bpp RGB case is wired up for now (mapping = 1, MISC0[7:5]
+= 1, MISC1 = 0) since that's what TCON-TV1 hands us. The dispatch
+function leaves room for YUV422 / YUV444 / higher bit depths to be
+added once a user shows up.
+
+Scrambling is left to the standard drm_dp helpers: training writes
+DP_LINK_SCRAMBLING_DISABLE during patterns 1/2, then disables
+training (which re-enables scrambling) before the video stream
+turns on.
+
+Signed-off-by: Jernej Skrabec <jernej.skrabec@gmail.com>
+---
+ drivers/gpu/drm/sun4i/sun55i_edp.c | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
+
+diff --git a/drivers/gpu/drm/sun4i/sun55i_edp.c b/drivers/gpu/drm/sun4i/sun55i_edp.c
+index a25964edacec..c509fd4c4243 100644
+--- a/drivers/gpu/drm/sun4i/sun55i_edp.c
++++ b/drivers/gpu/drm/sun4i/sun55i_edp.c
+@@ -124,6 +124,12 @@
+ #define  SUN55I_EDP_CAP_RATE_HI		GENMASK(28, 26)
+ #define  SUN55I_EDP_CAPACITY_LINK_RESET	(GENMASK(11, 0) | GENMASK(28, 26))
+ 
++#define SUN55I_EDP_VIDEO_MAPPING	SUN55I_EDP_VIDEO_STREAM_EN
++#define  SUN55I_EDP_VIDEO_MAPPING_MASK	GENMASK(20, 16)
++#define SUN55I_EDP_MSA_MISC0		0x0228
++#define  SUN55I_EDP_MSA_MISC0_VAL	GENMASK(31, 24)
++#define SUN55I_EDP_MSA_MISC1		0x022c
++#define  SUN55I_EDP_MSA_MISC1_VAL	GENMASK(31, 24)
+ #define SUN55I_EDP_FRAME_UNIT		0x0220
+ #define  SUN55I_EDP_FRAME_UNIT_SYMBOL	GENMASK(6, 0)
+ #define  SUN55I_EDP_FRAME_UNIT_TU	GENMASK(13, 7)
+@@ -619,6 +625,26 @@ static int sun55i_edp_link_train_at(struct sun55i_edp *edp, u8 link_rate,
+ 
+ #define SUN55I_EDP_LS_PER_TU	64
+ 
++static void sun55i_edp_set_video_format(struct sun55i_edp *edp)
++{
++	u32 val;
++
++	/* 24bpp RGB: mapping=1, MISC0[7:5]=1, MISC1=0. */
++	val = readl(edp->regs + SUN55I_EDP_VIDEO_MAPPING);
++	val &= ~SUN55I_EDP_VIDEO_MAPPING_MASK;
++	val |= FIELD_PREP(SUN55I_EDP_VIDEO_MAPPING_MASK, 1);
++	writel(val, edp->regs + SUN55I_EDP_VIDEO_MAPPING);
++
++	val = readl(edp->regs + SUN55I_EDP_MSA_MISC0);
++	val &= ~SUN55I_EDP_MSA_MISC0_VAL;
++	val |= FIELD_PREP(SUN55I_EDP_MSA_MISC0_VAL, 1 << 5);
++	writel(val, edp->regs + SUN55I_EDP_MSA_MISC0);
++
++	val = readl(edp->regs + SUN55I_EDP_MSA_MISC1);
++	val &= ~SUN55I_EDP_MSA_MISC1_VAL;
++	writel(val, edp->regs + SUN55I_EDP_MSA_MISC1);
++}
++
+ static int sun55i_edp_set_transfer_unit(struct sun55i_edp *edp, u32 bpp,
+ 					u8 lanes, u8 link_rate, u32 pixel_khz)
+ {
+@@ -794,6 +820,8 @@ static void sun55i_edp_bridge_atomic_enable(struct drm_bridge *bridge,
+ 		dev_warn(edp->dev,
+ 			 "Link training failed, output may be unstable.\n");
+ 
++	sun55i_edp_set_video_format(edp);
++
+ 	if (mode && edp->lanes && edp->link_rate &&
+ 	    sun55i_edp_set_transfer_unit(edp, 24, edp->lanes,
+ 					 edp->link_rate, mode->clock))
+-- 
+2.53.0
+

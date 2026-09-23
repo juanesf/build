@@ -1,0 +1,87 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Armbian <armbian@localhost>
+Date: Tue, 22 Sep 2026 22:50:00 -0300
+Subject: [PATCH] arm64: dts: allwinner: a527: Power Cubie A5E HDMI PHY
+
+The Cubie A5E DE fetch aperture only reaches low DRAM, so pin the CMA pool
+low and wire the HDMI PHY rails: hvcc-supply (reg_cldo1) and force the
+related AXP717 rails always-on so the PHY stays powered after probe.
+
+Signed-off-by: Armbian <armbian@localhost>
+---
+ arch/arch/arm64/boot/dts/allwinner/sun55i-a527-cubie-a5e.dts | 31 +++++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertion(+)
+
+diff --git a/arch/arm64/boot/dts/allwinner/sun55i-a527-cubie-a5e.dts b/arch/arm64/boot/dts/allwinner/sun55i-a527-cubie-a5e.dts
+index 35c7a9f24c2ef238c7cfcd3e5299a098f2b123c2..dc1a188e1c565f7e30e58e54668e372e1ba08956 100644
+--- a/arch/arm64/boot/dts/allwinner/sun55i-a527-cubie-a5e.dts
++++ b/arch/arm64/boot/dts/allwinner/sun55i-a527-cubie-a5e.dts
+@@ -34,6 +34,33 @@
+ 		};
+ 	};
+ 
++	reserved-memory {
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++
++		/*
++		 * The display engine's layer DMA master has a limited fetch
++		 * aperture and can only reach low DRAM (it reads the RCQ pool at
++		 * ~0x43000000 but not 0x4b100000). The kernel's default CMA is
++		 * high (~0xf0000000), so scanout fetches zeros (black). Pin CMA
++		 * just above the kernel image (ends ~0x42c70000) and the RCQ
++		 * pool (~0x43000000), below the dtb (~0x49ff6000).
++		 */
++		linux,cma {
++			compatible = "shared-dma-pool";
++			reusable;
++			/* pin low: the DE fetch aperture only reaches DRAM below
++			 * ~0x4b100000; stop at 0x48000000 to stay clear of the
++			 * secmon@48000000/48100000 and vdev@4ae00000 no-map
++			 * reservations (overlap hands out no-map pages -> oops) */
++			reg = <0x0 0x43000000 0x0 0x5000000>;
++			alloc-ranges = <0x0 0x43000000 0x0 0x5000000>;
++			size = <0x0 0x5000000>;
++			linux,cma-default;
++		};
++	};
++
+ 	dp-connector {
+ 		compatible = "dp-connector";
+ 		type = "full-size";
+@@ -144,6 +171,7 @@
+ };
+ 
+ &hdmi {
++	hvcc-supply = <&reg_cldo1>;
+ 	status = "okay";
+ };
+ 
+@@ -292,6 +320,7 @@
+ 			};
+ 
+ 			reg_aldo2: aldo2 {
++				regulator-always-on;
+ 				regulator-min-microvolt = <1800000>;
+ 				regulator-max-microvolt = <1800000>;
+ 				regulator-name = "vcc-pe";
+@@ -327,6 +356,7 @@
+ 			};
+ 
+ 			reg_bldo3: bldo3 {
++				regulator-always-on;
+ 				regulator-min-microvolt = <3300000>;
+ 				regulator-max-microvolt = <3300000>;
+ 				regulator-name = "vcc-mipi-cam";
+@@ -337,6 +367,7 @@
+ 			};
+ 
+ 			reg_cldo1: cldo1 {
++				regulator-always-on;
+ 				regulator-min-microvolt = <1800000>;
+ 				regulator-max-microvolt = <1800000>;
+ 				regulator-name = "vcc-pc-and-their-dog";
+
+-- 
+2.53.0

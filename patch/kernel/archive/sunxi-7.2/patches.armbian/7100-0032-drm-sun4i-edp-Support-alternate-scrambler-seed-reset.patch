@@ -1,0 +1,79 @@
+From 59ec7f33870fff5e4877ac0bd205c5914ffcc52a Mon Sep 17 00:00:00 2001
+From: Jernej Skrabec <jernej.skrabec@gmail.com>
+Date: Sat, 23 May 2026 12:09:32 +0000
+Subject: [PATCH] drm/sun4i: edp: Support alternate scrambler seed reset (ASSR)
+
+ASSR is required by VESA eDP compliance: the scrambler resets to
+seed 0xffff instead of the standard DP 0xfffe. Pick it up when the
+sink advertises support for it via DPCD 0x0000d bit 0 and the
+output is the eDP variant. On the controller side this is just a
+single bit (REG_VIDEO_STREAM_EN[24]); on the sink side a write to
+DP_EDP_CONFIGURATION_SET with the matching bit set.
+
+For the DP variant ASSR is left disabled, matching the spec.
+
+Signed-off-by: Jernej Skrabec <jernej.skrabec@gmail.com>
+---
+ drivers/gpu/drm/sun4i/sun55i_edp.c | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
+
+diff --git a/drivers/gpu/drm/sun4i/sun55i_edp.c b/drivers/gpu/drm/sun4i/sun55i_edp.c
+index 508caac7404e..4145fce2efb9 100644
+--- a/drivers/gpu/drm/sun4i/sun55i_edp.c
++++ b/drivers/gpu/drm/sun4i/sun55i_edp.c
+@@ -102,6 +102,7 @@
+ 
+ #define SUN55I_EDP_VIDEO_STREAM_EN	0x0200
+ #define  SUN55I_EDP_VIDEO_STREAM_EN_BIT	BIT(5)
++#define  SUN55I_EDP_ASSR_EN		BIT(24)
+ #define SUN55I_EDP_SYNC_POLARITY	0x020c
+ #define  SUN55I_EDP_VSYNC_POL		BIT(0)
+ #define  SUN55I_EDP_HSYNC_POL		BIT(1)
+@@ -344,6 +345,7 @@ static void sun55i_edp_aux_clock_setup(struct sun55i_edp *edp, u32 bit_mhz);
+ static void sun55i_edp_corepll_set(struct sun55i_edp *edp,
+ 				   const struct sun55i_edp_pll_cfg *cfg);
+ static void sun55i_edp_ssc_set(struct sun55i_edp *edp, bool enable);
++static void sun55i_edp_assr_set(struct sun55i_edp *edp, bool enable);
+ static int sun55i_edp_pixpll_set(struct sun55i_edp *edp, u32 pixel_khz);
+ 
+ /*
+@@ -662,6 +664,18 @@ static int sun55i_edp_link_train_at(struct sun55i_edp *edp, u8 link_rate,
+ 	if (ret < 0)
+ 		return ret;
+ 
++	if (edp->variant->connector_type == DRM_MODE_CONNECTOR_eDP &&
++	    (edp->dpcd[DP_EDP_CONFIGURATION_CAP] &
++	     DP_ALTERNATE_SCRAMBLER_RESET_CAP)) {
++		sun55i_edp_assr_set(edp, true);
++		ret = drm_dp_dpcd_writeb(&edp->aux, DP_EDP_CONFIGURATION_SET,
++					 DP_ALTERNATE_SCRAMBLER_RESET_ENABLE);
++		if (ret < 0)
++			return ret;
++	} else {
++		sun55i_edp_assr_set(edp, false);
++	}
++
+ 	ret = sun55i_edp_link_train_cr(edp, lanes);
+ 	if (ret < 0)
+ 		goto out;
+@@ -1157,6 +1171,17 @@ static void sun55i_edp_ssc_set(struct sun55i_edp *edp, bool enable)
+ 	writel(val, edp->regs + SUN55I_EDP_ANA_PLL_FBDIV);
+ }
+ 
++static void sun55i_edp_assr_set(struct sun55i_edp *edp, bool enable)
++{
++	u32 val = readl(edp->regs + SUN55I_EDP_VIDEO_STREAM_EN);
++
++	if (enable)
++		val |= SUN55I_EDP_ASSR_EN;
++	else
++		val &= ~SUN55I_EDP_ASSR_EN;
++	writel(val, edp->regs + SUN55I_EDP_VIDEO_STREAM_EN);
++}
++
+ struct sun55i_edp_pixpll {
+ 	u8 prediv;
+ 	u8 fbdiv_h4;
+-- 
+2.53.0
+

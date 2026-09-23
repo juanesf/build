@@ -1,0 +1,53 @@
+From 7cda41dd54ab91bb28d34a56323871fa54500b52 Mon Sep 17 00:00:00 2001
+From: Jernej Skrabec <jernej.skrabec@gmail.com>
+Date: Sat, 23 May 2026 10:53:12 +0000
+Subject: [PATCH] drm/sun4i: edp: Read EDID over AUX in get_modes
+
+Now that the AUX channel is functional, fetch the sink EDID via the
+drm_dp_aux DDC adapter when the connector probes its modes. Without
+a connected sink (no HPD plug-in) skip the read and report zero
+modes so the connector reports as disconnected without churning the
+bus.
+
+Signed-off-by: Jernej Skrabec <jernej.skrabec@gmail.com>
+---
+ drivers/gpu/drm/sun4i/sun55i_edp.c | 16 ++++++++++++++--
+ 1 file changed, 14 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpu/drm/sun4i/sun55i_edp.c b/drivers/gpu/drm/sun4i/sun55i_edp.c
+index dbb915ca3717..6c732f1e5843 100644
+--- a/drivers/gpu/drm/sun4i/sun55i_edp.c
++++ b/drivers/gpu/drm/sun4i/sun55i_edp.c
+@@ -28,6 +28,7 @@
+ #include <drm/drm_atomic_helper.h>
+ #include <drm/drm_bridge.h>
+ #include <drm/drm_drv.h>
++#include <drm/drm_edid.h>
+ #include <drm/drm_of.h>
+ #include <drm/drm_probe_helper.h>
+ #include <drm/drm_simple_kms_helper.h>
+@@ -234,8 +235,19 @@ static const struct drm_bridge_funcs sun55i_edp_bridge_funcs = {
+ 
+ static int sun55i_edp_connector_get_modes(struct drm_connector *connector)
+ {
+-	/* TODO: read EDID via AUX once AUX transfer is implemented. */
+-	return 0;
++	struct sun55i_edp *edp = connector_to_sun55i_edp(connector);
++	const struct drm_edid *drm_edid;
++	int count;
++
++	if (!edp->plugged)
++		return 0;
++
++	drm_edid = drm_edid_read_ddc(connector, &edp->aux.ddc);
++	drm_edid_connector_update(connector, drm_edid);
++	count = drm_edid_connector_add_modes(connector);
++	drm_edid_free(drm_edid);
++
++	return count;
+ }
+ 
+ static const struct drm_connector_helper_funcs sun55i_edp_connector_helper_funcs = {
+-- 
+2.53.0
+
