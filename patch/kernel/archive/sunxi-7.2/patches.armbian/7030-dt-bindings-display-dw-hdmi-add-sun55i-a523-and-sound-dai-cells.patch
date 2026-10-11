@@ -1,0 +1,51 @@
+commit 3f8760c24d8c46cb921099244cf2a2df9ca81c51
+Author: Juan Sanchez <juanesf91@gmail.com>
+Date:   Sat Oct 10 22:47:54 2026 -0300
+
+    sunxi-7.2: bindings for A523 HDMI audio (dw-hdmi + simple-card playback-only)
+
+diff --git a/patch/kernel/archive/sunxi-7.2/patches.armbian/7030-dt-bindings-display-dw-hdmi-add-sun55i-a523-and-sound-dai-cells.patch b/patch/kernel/archive/sunxi-7.2/patches.armbian/7030-dt-bindings-display-dw-hdmi-add-sun55i-a523-and-sound-dai-cells.patch
+new file mode 100644
+index 000000000..df1a38680
+--- /dev/null
++++ b/patch/kernel/archive/sunxi-7.2/patches.armbian/7030-dt-bindings-display-dw-hdmi-add-sun55i-a523-and-sound-dai-cells.patch
+@@ -0,0 +1,39 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: review <review@example.com>
++Date: Sat, 4 Oct 2026 00:00:00 +0000
++Subject: dt-bindings: display: dw-hdmi: add sun55i-a523 compatible and #sound-dai-cells
++
++Add allwinner,sun55i-a523-dw-hdmi (with sun50i-h6 fallback) and
++define #sound-dai-cells = <0> for HDMI audio support on A523.
++
++Signed-off-by: review <review@example.com>
++---
++ Documentation/devicetree/bindings/display/allwinner,sun8i-a83t-dw-hdmi.yaml | 8 ++++++++
++ 1 file changed, 8 insertions(+)
++
++diff --git a/Documentation/devicetree/bindings/display/allwinner,sun8i-a83t-dw-hdmi.yaml b/Documentation/devicetree/bindings/display/allwinner,sun8i-a83t-dw-hdmi.yaml
++index 111111111111..222222222222 100644
++--- a/Documentation/devicetree/bindings/display/allwinner,sun8i-a83t-dw-hdmi.yaml
+++++ b/Documentation/devicetree/bindings/display/allwinner,sun8i-a83t-dw-hdmi.yaml
++@@ -28,6 +28,10 @@ properties:
++       - const: allwinner,sun8i-a83t-dw-hdmi
++       - const: allwinner,sun50i-h6-dw-hdmi
++ 
+++      - items:
+++          - const: allwinner,sun55i-a523-dw-hdmi
+++          - const: allwinner,sun50i-h6-dw-hdmi
+++
++       - items:
++           - const: allwinner,sun50i-h616-dw-hdmi
++           - const: allwinner,sun50i-h6-dw-hdmi
++@@ -85,6 +89,10 @@ properties:
++   phy-names:
++     const: phy
++ 
+++  "#sound-dai-cells":
+++    const: 0
+++    description: For HDMI audio
+++
++   hvcc-supply:
++     description:
++       The VCC power supply of the controller

@@ -1,0 +1,46 @@
+commit 3f8760c24d8c46cb921099244cf2a2df9ca81c51
+Author: Juan Sanchez <juanesf91@gmail.com>
+Date:   Sat Oct 10 22:47:54 2026 -0300
+
+    sunxi-7.2: bindings for A523 HDMI audio (dw-hdmi + simple-card playback-only)
+
+diff --git a/patch/kernel/archive/sunxi-7.2/patches.armbian/7031-dt-bindings-sound-simple-card-add-playback-capture-only.patch b/patch/kernel/archive/sunxi-7.2/patches.armbian/7031-dt-bindings-sound-simple-card-add-playback-capture-only.patch
+new file mode 100644
+index 000000000..f852faf9c
+--- /dev/null
++++ b/patch/kernel/archive/sunxi-7.2/patches.armbian/7031-dt-bindings-sound-simple-card-add-playback-capture-only.patch
+@@ -0,0 +1,34 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: review <review@example.com>
++Date: Sat, 4 Oct 2026 00:00:00 +0000
++Subject: dt-bindings: sound: simple-card: add playback-only/capture-only
++
++Add root-level playback-only and capture-only boolean flags to
++simple-card binding to match driver behavior.
++
++Signed-off-by: review <review@example.com>
++---
++ Documentation/devicetree/bindings/sound/simple-card.yaml | 10 ++++++++++
++ 1 file changed, 10 insertions(+)
++
++diff --git a/Documentation/devicetree/bindings/sound/simple-card.yaml b/Documentation/devicetree/bindings/sound/simple-card.yaml
++index 111111111111..222222222222 100644
++--- a/Documentation/devicetree/bindings/sound/simple-card.yaml
+++++ b/Documentation/devicetree/bindings/sound/simple-card.yaml
++@@ -98,6 +98,16 @@ properties:
++     description: device name prefix
++     $ref: /schemas/types.yaml#/definitions/string
++ 
+++  playback-only:
+++    description: |
+++      The sound card is for playback only.
+++    $ref: /schemas/types.yaml#/definitions/flag
+++
+++  capture-only:
+++    description: |
+++      The sound card is for capture only.
+++    $ref: /schemas/types.yaml#/definitions/flag
+++
++   label:
++     maxItems: 1
++ 
