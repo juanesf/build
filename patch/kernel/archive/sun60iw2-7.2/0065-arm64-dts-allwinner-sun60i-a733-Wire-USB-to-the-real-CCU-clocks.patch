@@ -1,0 +1,43 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Juanesf <juanesf91@users.noreply.github.com>
+Date: Tue, 11 Nov 2026 00:00:00 +0000
+Subject: [PATCH] arm64: dts: allwinner: sun60i-a733: wire USB to the real CCU clocks
+
+The USB2.0 femtoPHY is clocked by the CCU's CLK_RES_DCAP_24M gate, not
+by the raw 24 MHz oscillator, and the DWC3 core also has a suspend clock
+and lives in the PCK600 USB2 power domain.  Describe all three at the SoC
+level so every A733 board gets them, matching the vendor firmware.
+
+Signed-off-by: Juanesf <juanesf91@users.noreply.github.com>
+---
+ arch/arm64/boot/dts/allwinner/sun60i-a733.dtsi | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
+
+--- a/arch/arm64/boot/dts/allwinner/sun60i-a733.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun60i-a733.dtsi
+@@ -630,7 +630,7 @@
+ 			reg = <0x06b00000 0x800>,
+ 			      <0x03000000 0x300>;
+ 			reg-names = "u2_base", "res_base";
+-			clocks = <&ccu CLK_BUS_OTG>, <&osc24M>;
++			clocks = <&ccu CLK_BUS_OTG>, <&ccu CLK_RES_DCAP_24M>;
+ 			clock-names = "phy_clk", "res_dcap";
+ 			aw,rext_mode = <2>;
+ 			aw,phy_tune_param = <0x143338D6>;
+@@ -642,12 +642,13 @@
+ 			compatible = "snps,dwc3";
+ 			reg = <0x06a00000 0x100000>;
+ 			interrupts = <GIC_SPI 155 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&ccu CLK_BUS_OTG>, <&ccu CLK_USB2_MF>;
+-			clock-names = "bus_clk", "ref";
+-			assigned-clocks = <&ccu CLK_USB2_MF>;
++			clocks = <&ccu CLK_BUS_OTG>, <&ccu CLK_USB2_U2_REF>, <&ccu CLK_USB2_SUSPEND>;
++			clock-names = "bus_clk", "ref", "suspend";
++			assigned-clocks = <&ccu CLK_USB2_SUSPEND>;
+ 			assigned-clock-rates = <24000000>;
+ 			resets = <&ccu RST_BUS_OTG>, <&ccu RST_BUS_USB2>;
+ 			reset-names = "bus", "dwc3";
++			power-domains = <&pck600 PD_USB2>;
+ 			maximum-speed = "super-speed-plus";
+ 			phy_type = "utmi";
+ 			dr_mode = "host";

@@ -1,0 +1,414 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Juanesf <juanesf91@users.noreply.github.com>
+Date: Sun, 9 Nov 2026 00:00:00 +0000
+Subject: [PATCH] arm64: dts: allwinner: add Radxa Cubie A7A
+
+Add a device tree for the Radxa Cubie A7A, an Allwinner A733 (sun60iw2)
+board with LPDDR5, eMMC, Gigabit Ethernet, a USB2 hub and an AIC8800
+USB WiFi/BT module. The DWC3 controller is used in USB2-only host mode;
+the SuperSpeed combo PHY is left disabled because the lane is muxed to
+PCIe on this board.
+
+Both status LEDs are active-high per the Radxa Cubie A7A V1.10 schematic
+(page 19, KEY_LED_RTC_FAN): PJ26 drives the gate of Q11 (FDV301N), which
+sinks LED_GREEN, and PJ27 drives LED_BLUE directly through R211. A high
+level on either GPIO therefore turns the corresponding LED on.
+
+Signed-off-by: Juanesf <juanesf91@users.noreply.github.com>
+---
+diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
+--- a/arch/arm64/boot/dts/allwinner/Makefile
++++ b/arch/arm64/boot/dts/allwinner/Makefile
+@@ -111,5 +111,7 @@
+ dtb-$(CONFIG_ARCH_SUNXI) += sun60i-a733-orangepi-4-pro.dtb
+ 
++dtb-$(CONFIG_ARCH_SUNXI) += sun60i-a733-cubie-a7a.dtb
++
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h618-walnutpi-box.dtb
+ 
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-olinuxino-2Ge8G.dtb
+diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts
+new file mode 100644
+index 000000000..2e1b9a6ed
+--- /dev/null
++++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts
+@@ -0,0 +1,377 @@
++// SPDX-License-Identifier: (GPL-2.0-only OR MIT)
++/*
++ * Copyright (C) 2026 Radxa Computer Co., Ltd.
++ */
++
++/dts-v1/;
++
++#include "sun60i-a733.dtsi"
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/leds/common.h>
++
++/ {
++	model = "Radxa Cubie A7A";
++	compatible = "radxa,cubie-a7a", "allwinner,sun60i-a733";
++
++	aliases {
++		ethernet0 = &gmac0;
++		serial0 = &uart0;
++		mmc0 = &mmc0;
++		mmc2 = &mmc2;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	/*
++	 * The A7A is available with 2/4/6/8/12/16 GiB of LPDDR5.
++	 * The bootloader replaces this node with the detected size.
++	 */
++	memory@40000000 {
++		device_type = "memory";
++		reg = <0x00 0x40000000 0x00 0x80000000>;
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		led-power {
++			function = LED_FUNCTION_POWER;
++			color = <LED_COLOR_ID_GREEN>;
++			gpios = <&pio 9 26 GPIO_ACTIVE_HIGH>; /* PJ26, LED_GREEN */
++			default-state = "on";
++		};
++
++		led-user {
++			function = LED_FUNCTION_ACTIVITY;
++			color = <LED_COLOR_ID_BLUE>;
++			gpios = <&pio 9 27 GPIO_ACTIVE_HIGH>; /* PJ27, LED_BLUE */
++			linux,default-trigger = "heartbeat";
++		};
++	};
++
++	reg_vcc5v: regulator-vcc5v {
++		compatible = "regulator-fixed";
++		regulator-name = "vcc-5v";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-always-on;
++	};
++
++	reg_usb0_vbus: regulator-usb0-vbus {
++		compatible = "regulator-fixed";
++		regulator-name = "usb0-vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		vin-supply = <&reg_vcc5v>;
++		gpio = <&r_pio 0 2 GPIO_ACTIVE_HIGH>; /* PL2 */
++		enable-active-high;
++		regulator-always-on;
++	};
++
++	reg_usb1_vbus: regulator-usb1-vbus {
++		compatible = "regulator-fixed";
++		regulator-name = "usb1-vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		vin-supply = <&reg_vcc5v>;
++		gpio = <&r_pio 1 5 GPIO_ACTIVE_HIGH>; /* PM5 */
++		enable-active-high;
++		regulator-always-on;
++	};
++
++	reg_wifi_power: regulator-wifi-power {
++		compatible = "regulator-fixed";
++		regulator-name = "wifi-power";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		vin-supply = <&reg_vcc5v>;
++		gpio = <&r_pio 1 0 GPIO_ACTIVE_HIGH>; /* PM0 */
++		enable-active-high;
++		regulator-always-on;
++	};
++
++	reg_wifi_chip_en: regulator-wifi-chip-en {
++		compatible = "regulator-fixed";
++		regulator-name = "wifi-chip-en";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		vin-supply = <&reg_vcc5v>;
++		gpio = <&r_pio 1 1 GPIO_ACTIVE_HIGH>; /* PM1 */
++		enable-active-high;
++		regulator-always-on;
++	};
++};
++
++&pio {
++	vcc-pb-supply = <&reg_swout1>;
++	vcc-pc-supply = <&reg_cldo5>;
++	vcc-pd-supply = <&reg_swout1>;
++	vcc-pe-supply = <&reg_bldo1>;
++	vcc-pf-supply = <&reg_cldo5>;
++	vcc-pg-supply = <&reg_aldo1>;
++	vcc-ph-supply = <&reg_swout1>;
++	vcc-pj-supply = <&reg_swout1>;
++	vcc-pk-supply = <&reg_bldo1>;
++
++	mmc2_a7a_pins: mmc2-a7a-pins {
++		pins = "PC0", "PC1", "PC5", "PC6", "PC8",
++		       "PC9", "PC10", "PC11", "PC13", "PC14",
++		       "PC15", "PC16";
++		function = "mmc2";
++		allwinner,pinmux = <3>;
++		drive-strength = <30>;
++		bias-pull-up;
++	};
++};
++
++&r_pio {
++	vcc-pm-supply = <&reg_aldo1>;
++	status = "okay";
++};
++
++&uart0 {
++	clock-frequency = <24000000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pb_pins>;
++	status = "okay";
++};
++
++&mmc0 {
++	vmmc-supply = <&reg_swout2>;
++	vqmmc-supply = <&reg_swout2>;
++	cd-gpios = <&pio 5 6 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>; /* PF6 */
++	bus-width = <4>;
++	no-1-8-v;
++	max-frequency = <50000000>;
++	disable-wp;
++	status = "okay";
++};
++
++&mmc2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc2_a7a_pins>;
++	vmmc-supply = <&reg_aldo5>;
++	vqmmc-supply = <&reg_cldo5>;
++	bus-width = <8>;
++	non-removable;
++	cap-mmc-highspeed;
++	mmc-ddr-1_8v;
++	mmc-hs200-1_8v;
++	max-frequency = <150000000>;
++	status = "okay";
++};
++
++&r_i2c0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&r_i2c0_pins>;
++	clock-frequency = <400000>;
++	status = "okay";
++
++	axp318w: pmic@36 {
++		compatible = "x-powers,axp318w";
++		reg = <0x36>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		vin19-supply = <&reg_vcc5v>;
++		vin23-supply = <&reg_vcc5v>;
++		vin45-supply = <&reg_vcc5v>;
++		vin678-supply = <&reg_vcc5v>;
++		aldo156in-supply = <&reg_vcc5v>;
++		aldo234in-supply = <&reg_aldo1>;
++		bldoin-supply = <&reg_vcc5v>;
++		cldoin-supply = <&reg_vcc5v>;
++		dldoin-supply = <&reg_vcc5v>;
++		ips-supply = <&reg_vcc5v>;
++
++		regulators {
++			reg_dcdc1: dcdc1 {
++				regulator-name = "vcc-3v3";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			reg_aldo1: aldo1 {
++				regulator-name = "vcc-pl-pm";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			reg_aldo5: aldo5 {
++				regulator-name = "vcc-emmc";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			reg_bldo1: bldo1 {
++				regulator-name = "vcc-1v8-pe-pcie";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-always-on;
++			};
++
++			reg_swout1: swout1 {
++				regulator-name = "vcc-3v3-usb-lcd";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			reg_swout2: swout2 {
++				regulator-name = "vcc-3v3-card";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			reg_cldo3: cldo3 {
++				regulator-name = "vcc-1v8-dram-pll";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-always-on;
++			};
++
++			reg_cldo5: cldo5 {
++				regulator-name = "vcc-1v8-pc-pf";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-always-on;
++			};
++		};
++	};
++};
++
++&gmac0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&gmac0_rgmii_pins>;
++	phy-mode = "rgmii";
++	phy-handle = <&ext_rgmii_phy>;
++	phy-supply = <&reg_swout1>;
++	tx-internal-delay-ps = <2160>;
++	rx-internal-delay-ps = <1800>;
++	allwinner,tx-delay-ps = <2160>;
++	allwinner,rx-delay-ps = <1800>;
++	status = "okay";
++
++	mdio: mdio {
++		compatible = "snps,dwmac-mdio";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		ext_rgmii_phy: ethernet-phy@1 {
++			compatible = "ethernet-phy-id7b74.4412",
++				     "ethernet-phy-ieee802.3-c22";
++			reg = <1>;
++			reset-gpios = <&pio 7 16 GPIO_ACTIVE_LOW>; /* PH16 */
++			reset-assert-us = <10000>;
++			reset-deassert-us = <150000>;
++		};
++	};
++};
++
++&usbphy {
++	usb0_vbus-supply = <&reg_usb0_vbus>;
++	usb1_vbus-supply = <&reg_usb0_vbus>;
++	status = "okay";
++};
++
++&ehci0 {
++	vbus-supply = <&reg_usb0_vbus>;
++	status = "okay";
++};
++
++&ohci0 {
++	vbus-supply = <&reg_usb0_vbus>;
++	status = "okay";
++};
++
++&ehci1 {
++	vbus-supply = <&reg_usb0_vbus>;
++	status = "okay";
++};
++
++&ohci1 {
++	vbus-supply = <&reg_usb0_vbus>;
++	status = "okay";
++};
++
++&u2phy {
++	status = "okay";
++};
++
++/*
++ * The A7A's DWC3 instance is wired to the USB 2.0 PHY; combo PHY 1
++ * is used for PCIe. Keep this controller at high speed so the top
++ * USB hub and the AIC8800 are usable.
++ */
++&dwc3 {
++	dr_mode = "host";
++	maximum-speed = "high-speed";
++	phys = <&u2phy>;
++	phy-names = "usb2-phy";
++	vbus-supply = <&reg_usb1_vbus>;
++	status = "okay";
++};
++
++&combo0_usb {
++	status = "disabled";
++};
++
++&serdes {
++	serdes1v8-supply = <&reg_cldo5>;
++	assigned-clocks = <&ccu CLK_SERDES_PHY>;
++	assigned-clock-parents = <&ccu CLK_PLL_PERIPH0_600M>;
++	assigned-clock-rates = <100000000>;
++	status = "okay";
++};
++
++&combo1_pcie {
++	status = "okay";
++};
++
++&pcie_rc {
++	phys = <&combo1_pcie>;
++	phy-names = "pcie-phy";
++	power-gpios = <&pio 4 11 GPIO_ACTIVE_HIGH>; /* PE11 */
++	reset-gpios = <&pio 4 13 GPIO_ACTIVE_HIGH>; /* PE13 */
++	wake-gpios = <&pio 4 12 GPIO_ACTIVE_HIGH>; /* PE12 */
++	pcie3v3-supply = <&reg_dcdc1>;
++	status = "okay";
++};
++
++&spi0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&spi0_pc_pins>;
++	status = "okay";
++
++	flash@0 {
++		compatible = "jedec,spi-nor";
++		reg = <0>;
++		/* XM25QU128C; start conservatively so probe is reliable */
++		spi-max-frequency = <8000000>;
++		spi-rx-bus-width = <1>;
++		spi-tx-bus-width = <1>;
++	};
++};
++
++&dma {
++	status = "okay";
++};
++
++&ths {
++	status = "okay";
++};
++
++&gpadc {
++	status = "okay";
++};
++
++&ce {
++	status = "okay";
++};
+-- 
+2.53.0

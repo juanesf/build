@@ -1,0 +1,75 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Juanesf <juanesf91@users.noreply.github.com>
+Date: Mon, 9 Nov 2026 00:00:00 +0000
+Subject: [PATCH] serial: 8250_dw: fix Allwinner A733 DLF handling
+
+The A733 UART has a real fractional divisor latch, and the baud clock
+is the fixed bus clock gate. Treating the DLF as absent makes the
+kernel reprogram the divisor without the fractional part, so the
+console produces garbage as soon as 8250_dw takes over from earlycon.
+
+Drop the A733-specific NO_DLF quirk, validate the DLF readback as a
+real 2^n - 1 field, and keep the BUSY-safe set_divisor hook installed
+by the driver instead of replacing it with the generic one.
+
+Signed-off-by: Juanesf <juanesf91@users.noreply.github.com>
+---
+ drivers/tty/serial/8250/8250_dw.c    | 11 +----------
+ drivers/tty/serial/8250/8250_dwlib.c | 11 ++++++++---
+ 2 files changed, 9 insertions(+), 13 deletions(-)
+
+diff --git a/drivers/tty/serial/8250/8250_dw.c b/drivers/tty/serial/8250/8250_dw.c
+index c52a98a..bda80dc 100644
+--- a/drivers/tty/serial/8250/8250_dw.c
++++ b/drivers/tty/serial/8250/8250_dw.c
+@@ -887,15 +887,6 @@ static const struct dw8250_platform_data dw8250_skip_set_rate_data = {
+ 	.quirks = DW_UART_QUIRK_SKIP_SET_RATE,
+ };
+ 
+-/*
+- * The baud clock is the bus clock gate, whose rate cannot change, and offset
+- * 0xc0 is the RS485 control register rather than DLF.
+- */
+-static const struct dw8250_platform_data dw8250_sun60i_a733_data = {
+-	.usr_reg = DW_UART_USR,
+-	.quirks = DW_UART_QUIRK_SKIP_SET_RATE | DW_UART_QUIRK_NO_DLF,
+-};
+-
+ static const struct dw8250_platform_data dw8250_intc10ee = {
+ 	.usr_reg = DW_UART_USR,
+ 	.quirks = DW_UART_QUIRK_IER_KICK,
+@@ -912,7 +903,7 @@ static const struct dw8250_platform_data dw8250_ultrarisc_dp1000_data = {
+ 
+ static const struct of_device_id dw8250_of_match[] = {
+ 	{ .compatible = "snps,dw-apb-uart", .data = &dw8250_dw_apb },
+-	{ .compatible = "allwinner,sun60i-a733-uart", .data = &dw8250_sun60i_a733_data },
++	{ .compatible = "allwinner,sun60i-a733-uart", .data = &dw8250_skip_set_rate_data },
+ 	{ .compatible = "cavium,octeon-3860-uart", .data = &dw8250_octeon_3860_data },
+ 	{ .compatible = "marvell,armada-38x-uart", .data = &dw8250_armada_38x_data },
+ 	{ .compatible = "renesas,rzn1-uart", .data = &dw8250_renesas_rzn1_data },
+diff --git a/drivers/tty/serial/8250/8250_dwlib.c b/drivers/tty/serial/8250/8250_dwlib.c
+index 0b36bdc..98b6ef8 100644
+--- a/drivers/tty/serial/8250/8250_dwlib.c
++++ b/drivers/tty/serial/8250/8250_dwlib.c
+@@ -216,10 +216,17 @@ void dw8250_setup_port(struct uart_port *p)
+ 		reg = dw8250_readl_ext(p, DW_UART_DLF);
+ 		dw8250_writel_ext(p, DW_UART_DLF, old_dlf);
+ 
+-		if (reg) {
++		/*
++		 * DLF is a bit field starting at bit 0, so a real one reads
++		 * back as 2^n - 1. Any other value means this offset is
++		 * something else.
++		 */
++		if (reg && !(reg & (reg + 1))) {
+ 			pd->dlf_size = fls(reg);
+ 			p->get_divisor = dw8250_get_divisor;
+-			p->set_divisor = dw8250_set_divisor;
++			/* Keep a hook the driver has already installed */
++			if (!p->set_divisor)
++				p->set_divisor = dw8250_set_divisor;
+ 		}
+ 	}
+ 
+-- 
+2.53.0

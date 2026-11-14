@@ -1,0 +1,85 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Juanesf <juanesf91@users.noreply.github.com>
+Date: Fri, 13 Nov 2026 00:00:00 +0000
+Subject: [PATCH] usb: dwc3: sunxi: fix A733 USB2 clock rates
+
+The A733 boot chain leaves USB2_SUSPEND, USB2_MF and USB2_U3_UTMI at
+0x81000000: mux 1 (PERI0_300M) with FACTOR_M=0, i.e. an undivided
+300 MHz clock.  USB2_SUSPEND feeds DWC3's PWRDNSCALE (the DT asks for
+24 MHz), and the microframe/UTMI clocks feed the USB2 side of the core.
+At 300 MHz the on-board hub's pull-up is detected but every control
+transfer fails with -EPROTO (-71).
+
+Program the group explicitly: 24 MHz from SYS_CLK24M with divider 1,
+gating each clock off while the glitchless mux and divider are changed
+and then re-enabling it.  The USB2 port's UTMI clock itself comes from
+the femtoPHY (SerDes bit 21 clear), not from this divider.
+
+This patch only fixes the rates.  The DWC3 core-reset experiment that
+was previously bundled here is dropped: A/B tests on the board showed
+that a single re-assert of the SerDes UTMI clock select is sufficient
+for USBCMD.HCRST to complete, so the extra 200 ms reset sequence and
+its GUSB3PIPECTL0.PHYSOFTRST pulse (on a port whose combo PHY is
+disabled) are unnecessary.
+
+NOTE: this is out-of-tree board-enablement glue. Before any upstream
+submission the hard-coded SoC register accesses must be replaced by
+DT-described clock/reset/power-domain/PHY providers and the probe
+ordering must be expressed as a DT dependency (fw_devlink), not by
+polling a status bit from a generic host driver.
+
+Signed-off-by: Juanesf <juanesf91@users.noreply.github.com>
+---
+ drivers/usb/dwc3/core.c | 31 ++++++++++++++++++++-----------
+ 1 file changed
+
+diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
+--- a/drivers/usb/dwc3/core.c
++++ b/drivers/usb/dwc3/core.c
+@@ -2366,26 +2366,35 @@
+ 			writel(val | BIT(31), ccu_base + 0x1348);
+ 
+ 			/*
+-			 * USB2.0 suspend clock: gate, SYS_CLK24M source and
+-			 * divider 1.  The DWC3 PWRDNSCALE field is derived
+-			 * from this clock's rate.
++			 * USB2 suspend clock: 24 MHz from SYS_CLK24M, divider 1.
++			 * DWC3's PWRDNSCALE is derived from this rate; leaving
++			 * the boot chain's mux 1 (PERI0_300M) selected would
++			 * make the core's internal timers run 12.5x too fast.
+ 			 */
+ 			val = readl(ccu_base + 0x1350);
+-			val &= ~GENMASK(4, 0);
+-			writel(val | BIT(31) | BIT(24), ccu_base + 0x1350);
++			val &= ~(GENMASK(26, 24) | GENMASK(4, 0));
++			writel(val | BIT(31), ccu_base + 0x1350);
+ 
+ 			/*
+-			 * USB2 microframe and U3 UTMI: open the gates only and
+-			 * keep the source/divider the boot chain selected.  The
+-			 * microframe clock runs at its 24 MHz default (mux 0,
+-			 * divider 1) and is the core's bus clock; forcing the
+-			 * 60 MHz PERI0_300M path here leaves the port chirping
+-			 * J/K and it never completes speed detection.
++			 * USB2 microframe and U3 UTMI: 24 MHz from SYS_CLK24M,
++			 * divider 1.  The boot chain leaves both at mux 1 with
++			 * FACTOR_M=0 (0x81000000), i.e. PERI0_300M undivided =
++			 * 300 MHz; at that rate every control transfer fails
++			 * with -EPROTO.  Gate the clocks off while the glitchless
++			 * mux and the divider are changed, then open them again.
++			 * The USB2 port's UTMI clock itself comes from the
++			 * femtoPHY (SerDes bit 21 clear), not from this divider.
+ 			 */
+ 			val = readl(ccu_base + 0x1354);
++			writel(val & ~BIT(31), ccu_base + 0x1354);
++			udelay(10);
++			val &= ~(GENMASK(26, 24) | GENMASK(4, 0));
+ 			writel(val | BIT(31), ccu_base + 0x1354);
+ 
+ 			val = readl(ccu_base + 0x1360);
++			writel(val & ~BIT(31), ccu_base + 0x1360);
++			udelay(10);
++			val &= ~(GENMASK(26, 24) | GENMASK(4, 0));
+ 			writel(val | BIT(31), ccu_base + 0x1360);
+ 
+ 			/*

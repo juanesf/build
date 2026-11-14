@@ -1,0 +1,29 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Juanesf <juanesf91@users.noreply.github.com>
+Date: Mon, 9 Nov 2026 00:00:00 +0000
+Subject: [PATCH] serial: 8250_dw: respect the DT clock-frequency
+
+uart_read_port_properties() already parses "clock-frequency" into
+port->uartclk. Do not overwrite it with clk_get_rate() when the DT
+provides an explicit rate. This is needed on the Allwinner A733, where
+the UART baud clock is the fixed 24 MHz bus clock and the CCU clock
+rate reported by the kernel may not reflect the hardware.
+
+Signed-off-by: Juanesf <juanesf91@users.noreply.github.com>
+---
+ drivers/tty/serial/8250/8250_dw.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/tty/serial/8250/8250_dw.c b/drivers/tty/serial/8250/8250_dw.c
+--- a/drivers/tty/serial/8250/8250_dw.c
++++ b/drivers/tty/serial/8250/8250_dw.c
+@@ -719,7 +719,7 @@ static int dw8250_probe(struct platform_device *pdev)
+ 	if (IS_ERR(data->clk))
+ 		return dev_err_probe(dev, PTR_ERR(data->clk),
+ 				     "failed to get baudclk\n");
+ 
+-	if (data->clk)
++	if (data->clk && !p->uartclk)
+ 		p->uartclk = clk_get_rate(data->clk);
+ 
+ 	/* If no clock rate is defined, fail. */

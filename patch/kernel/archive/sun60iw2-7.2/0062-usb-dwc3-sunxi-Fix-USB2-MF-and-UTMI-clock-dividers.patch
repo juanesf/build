@@ -1,0 +1,274 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Juanesf <juanesf91@users.noreply.github.com>
+Date: Mon, 9 Nov 2026 00:00:00 +0000
+Subject: [PATCH] usb: dwc3: sunxi: fix A733 USB2 clock and PHY bring-up
+
+The A733 USB2.0 DWC3 instance needs more than the two CCU words the
+current hook writes.  Follow the A733 host firmware's USB clock init
+(A733Xhci2Dxe) instead:
+
+  - clear the key bits when enabling the USB/SerDes AHB master gates;
+  - enable CLK_MSI_LITE2, CLK_RES_DCAP_24M and the PLL_PERI0 output
+    gates (the DCAP clock is the U2P0 register window's mclk, without
+    it the PHY reads back zero and drops writes);
+  - configure USB2_U2_REF for 24 MHz from SYS_CLK24M and USB2_SUSPEND
+    for 24 MHz with divider 1;
+  - open the USB2_MF and USB2_U3_UTMI gates. The boot chain's
+    source/divider selection (mux 1, PERI0_300M, FACTOR_M=0 -> 300 MHz)
+    is wrong and is corrected by a follow-up patch;
+  - release the USB2 and SerDes block resets with read-modify-writes;
+  - write the SerDes subsystem's golden steady state (SERDES+0x0008 =
+    0x00030010) instead of preserving the boot chain's word: U-Boot
+    leaves the USB3 PIPE clocks and selects set (0x00130033 measured),
+    which makes the xHCI reset time out with -110;
+  - open the DCXO 24 MHz gate that feeds the combo PHY PLLs;
+  - match the host firmware's GCTL (U2 reset enabled, clock gating
+    disabled) and LLUCTL (0x008b8080, INV_SYNC_HDR clear) state.
+
+NOTE: this is out-of-tree board-enablement glue. The hard-coded
+SoC register programming must be replaced by DT-described clock,
+reset, power-domain and PHY providers before any upstream
+submission.
+
+Signed-off-by: Juanesf <juanesf91@users.noreply.github.com>
+---
+ drivers/usb/dwc3/core.c | 141 ++++++++++++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 125 insertions(+), 17 deletions(-)
+
+--- a/drivers/usb/dwc3/core.c
++++ b/drivers/usb/dwc3/core.c
+@@ -1112,6 +1112,15 @@
+ 	if (DWC3_VER_IS_PRIOR(DWC3, 190A))
+ 		reg |= DWC3_GCTL_U2RSTECN;
+ 
++	/*
++	 * The A733 host firmware runs the core with U2 reset enabled and
++	 * internal clock gating disabled.  The latter keeps the USB2 port's
++	 * UTMI clock alive while the port is idle, which this board's hub
++	 * needs to stay attached.
++	 */
++	if (of_machine_is_compatible("allwinner,sun60i-a733"))
++		reg |= DWC3_GCTL_U2RSTECN | DWC3_GCTL_DSBLCLKGTNG;
++
+ 	dwc3_writel(dwc, DWC3_GCTL, reg);
+ }
+ 
+@@ -1515,8 +1524,14 @@
+ 
+ 		for (i = 0; i < dwc->num_usb3_ports; i++) {
+ 			reg = dwc3_readl(dwc, DWC3_LLUCTL(i));
++			/*
++			 * A733 host firmware holds this word at 0x008b8080 on
++			 * a boot that enumerates the hub, with INV_SYNC_HDR
++			 * (bit 30) clear.  Reproduce the working state instead
++			 * of enabling the quirk the vendor DT asks for.
++			 */
+ 			if (of_machine_is_compatible("allwinner,sun60i-a733"))
+-				reg |= BIT(30); /* DWC3_LLUCTL_INV_SYNC_HDR for Cadence SerDes */
++				reg = 0x008b8080;
+ 			if (dwc->maximum_speed == USB_SPEED_SUPER)
+ 				reg |= DWC3_LLUCTL_FORCE_GEN1;
+ 			dwc3_writel(dwc, DWC3_LLUCTL(i), reg);
+@@ -2286,50 +2301,179 @@
+ 	if (ret)
+ 		goto err_assert_reset;
+ 
+-	/* Allwinner A733 DWC3 & SerDes Subsystem un-gate hook */
++	/*
++	 * Allwinner A733: bring up the USB subsystem clocks, the USB2.0
++	 * femtoPHY's register clock and the SerDes register clock before the
++	 * DWC3 core is touched.
++	 *
++	 * The sequence and the values follow the A733 host firmware's USB
++	 * clock init (EDK2 A733Xhci2Dxe).  It is deliberately made of
++	 * read-modify-writes so the boot chain's own bits survive.  Without
++	 * the DCAP gate the U2P0 register window at 0x06b00000 reads back
++	 * zero and drops every write; without the PLL_PERI0 output gates a
++	 * divider whose source is gated silently falls back to 24 MHz; and
++	 * without the block resets the core never answers.
++	 */
+ 	if (of_machine_is_compatible("allwinner,sun60i-a733")) {
+-		void __iomem *ccu_base, *subsys_base;
++		void __iomem *ccu_base, *subsys_base, *rtc_base;
+ 		u32 val;
+ 
+-		/* 1. CCU Clocks & Resets (base 0x02002000) */
+-		ccu_base = ioremap(0x02002000, 0x2000);
++		/* 1. CCU clocks and resets (base 0x02002000) */
++		ccu_base = ioremap(0x02002000, 0x3000);
+ 		if (ccu_base) {
+-			/* USB Reset / Clock Gate @ 0x1B30 */
+-			writel(0x00000001, ccu_base + 0x1b30);
+-
+-			/* AHB Master Gate @ 0x5C0: Enable SerDes (bit 8) and USB (bit 9) */
++			/* USB3.1 DRD gate/reset at 0x1b30, preserve all else */
++			val = readl(ccu_base + 0x1b30);
++			writel(val | BIT(0), ccu_base + 0x1b30);
++
++			/*
++			 * Keyed AHB master gate: bit 9 is the USB system and
++			 * bit 8 the SerDes.  Bits 2:0 are part of the key and
++			 * must never be OR-ed in, or six unrelated bus masters
++			 * get switched on.
++			 */
+ 			val = readl(ccu_base + 0x05c0);
+-			writel(val | BIT(8) | BIT(9), ccu_base + 0x05c0);
++			val |= BIT(8) | BIT(9);
++			val &= ~GENMASK(2, 0);
++			writel(val, ccu_base + 0x05c0);
+ 
+-			/* MBUS Master Gate @ 0x5E0: Enable SerDes (bit 28) */
++			/* MBUS master gate: SerDes is bit 28 */
+ 			val = readl(ccu_base + 0x05e0);
+ 			writel(val | BIT(28), ccu_base + 0x05e0);
+ 
+-			/* High speed clocks & resets */
+-			writel(0x81000000, ccu_base + 0x1350); /* 0x02003350: USB2_SUSPEND */
+-			writel(0x81000000, ccu_base + 0x1354); /* 0x02003354: USB2_MF (300MHz AXI) */
+-			writel(0x00010001, ccu_base + 0x135C); /* 0x0200335C: USB2_BGR (Reset deassert) */
+-			writel(0x81000000, ccu_base + 0x1360); /* 0x02003360: USB2_U3_UTMI */
+-			writel(0x81000000, ccu_base + 0x1364); /* 0x02003364: USB2_U2_PIPE (480MHz PLL) */
++			/* CLK_MSI_LITE2 gate plus its AHB/MBUS resets */
++			val = readl(ccu_base + 0x05a4);
++			writel(val | 0x00030001, ccu_base + 0x05a4);
++
++			/*
++			 * CLK_RES_DCAP_24M: the 24 MHz mclk of the USB2.0 PHY
++			 * register window.  A PHY block with no mclk reads as
++			 * zero and discards writes.
++			 */
++			val = readl(ccu_base + 0x1a00);
++			writel(val | BIT(3), ccu_base + 0x1a00);
++
++			/*
++			 * PLL_PERI0 output gates.  The boot chain leaves only
++			 * OUTPUT2 open; a divider whose source is gated falls
++			 * back to SYS_CLK24M without reporting it.
++			 */
++			val = readl(ccu_base + 0x00a0);
++			writel(val | GENMASK(27, 25), ccu_base + 0x00a0);
++
++			/*
++			 * USB2.0 PHY reference: 24 MHz from SYS_CLK24M,
++			 * not the 26 MHz DCXO.
++			 */
++			val = readl(ccu_base + 0x1348);
++			val &= ~GENMASK(26, 24);
++			writel(val | BIT(31), ccu_base + 0x1348);
++
++			/*
++			 * USB2.0 suspend clock: gate, SYS_CLK24M source and
++			 * divider 1.  The DWC3 PWRDNSCALE field is derived
++			 * from this clock's rate.
++			 */
++			val = readl(ccu_base + 0x1350);
++			val &= ~GENMASK(4, 0);
++			writel(val | BIT(31) | BIT(24), ccu_base + 0x1350);
++
++			/*
++			 * USB2 microframe and U3 UTMI: open the gates only and
++			 * keep the source/divider the boot chain selected.  The
++			 * microframe clock runs at its 24 MHz default (mux 0,
++			 * divider 1) and is the core's bus clock; forcing the
++			 * 60 MHz PERI0_300M path here leaves the port chirping
++			 * J/K and it never completes speed detection.
++			 */
++			val = readl(ccu_base + 0x1354);
++			writel(val | BIT(31), ccu_base + 0x1354);
++
++			val = readl(ccu_base + 0x1360);
++			writel(val | BIT(31), ccu_base + 0x1360);
++
++			/*
++			 * USB2 block reset and bus clock.  The U2 PIPE clock is
++			 * left exactly as the boot chain has it: this board's
++			 * USB2 port takes its UTMI clock from the femtoPHY.
++			 */
++			val = readl(ccu_base + 0x135c);
++			writel(val | 0x00010001, ccu_base + 0x135c);
++
++			/*
++			 * SerDes register clock: PERI0_600M / 6 = 100 MHz,
++			 * then release its block reset.
++			 */
++			val = readl(ccu_base + 0x13c0);
++			val &= ~(GENMASK(26, 24) | GENMASK(4, 0));
++			writel(val | BIT(24) | BIT(31) | 5, ccu_base + 0x13c0);
+ 
+-			writel(0x81000005, ccu_base + 0x13C0); /* 0x020033C0: SERDES_PHY_CFG = 100MHz refclk */
+-			writel(0x00010001, ccu_base + 0x13C4); /* 0x020033C4: SERDES_BGR (Reset deassert) */
++			val = readl(ccu_base + 0x13c4);
++			writel(val | 0x00010001, ccu_base + 0x13c4);
+ 
+-			dev_info(dev, "[CCU-DIAG] 0x5c0=0x%08x 0x5e0=0x%08x 0x3354=0x%08x 0x335c=0x%08x\n",
++			dev_info(dev, "[CCU-DIAG] 0x5c0=0x%08x 0x5e0=0x%08x 0x3354=0x%08x 0x335c=0x%08x 0x1a00=0x%08x\n",
+ 				 readl(ccu_base + 0x05c0), readl(ccu_base + 0x05e0),
+-				 readl(ccu_base + 0x1354), readl(ccu_base + 0x135C));
++				 readl(ccu_base + 0x1354), readl(ccu_base + 0x135C),
++				 readl(ccu_base + 0x1a00));
+ 			iounmap(ccu_base);
+ 		}
+ 
+-		/* 2. Subsystem Bus Gating & Routing */
++		/*
++		 * 2. SerDes subsystem clocks.  The host firmware's working
++		 * steady state for this word is exactly 0x00030010: AHB/AXI
++		 * transport clocks (bits 16/17), U2P0 PHY reset released
++		 * (bit 4) and the core's USB2 UTMI clock taken from the
++		 * femtoPHY (USB3P1_USB2P0_UTMI_CLK_SEL, bit 21, clear).
++		 *
++		 * U-Boot leaves the USB3 PIPE clocks and other selects set
++		 * here (0x00130033 was measured), and with that state the
++		 * later xHCI reset times out with -110.  Write the golden
++		 * value instead of preserving the boot chain's word.
++		 */
+ 		subsys_base = ioremap(0x06C00000, 0x1000);
+ 		if (subsys_base) {
+-			writel(0x00230010, subsys_base + 0x0008); /* SUBSYS_USB3P1_BGR: USB2 P1 PHY reset, clocks, UTMI */
+-			writel(0x20000000, subsys_base + 0x00F0); /* SUBSYS_DBG_CTL: disable debug test mux */
++			writel(0x00030010, subsys_base + 0x0008);
++			writel(0x20000000, subsys_base + 0x00F0); /* debug test mux off */
+ 			dev_info(dev, "[DWC3-SUBSYS-MMIO] 0x06c00008=0x%08x 0x06c000f0=0x%08x\n",
+ 				 readl(subsys_base + 0x0008), readl(subsys_base + 0x00F0));
+ 			iounmap(subsys_base);
+ 		}
++
++		/*
++		 * 3. DCXO 24 MHz gate for the combo PHY PLLs (RTC CCU + 0x16c,
++		 * bit 4).  The USBPHY PLLs have no reference without it.
++		 */
++		rtc_base = ioremap(0x07090000, 0x1000);
++		if (rtc_base) {
++			val = readl(rtc_base + 0x016c);
++			writel(val | BIT(4), rtc_base + 0x016c);
++			iounmap(rtc_base);
++		}
++
++		/*
++		 * 4. PCK600 USB2 power domain.  The femtoPHY's registers live
++		 * in this domain and read back as zero while it is off.  The
++		 * generic power-domain driver also manages it through the DTS
++		 * power-domains property, but doing it here matches the host
++		 * firmware and keeps the PHY usable even if genpd only powers
++		 * the domain on device runtime resume.
++		 */
++		ccu_base = ioremap(0x07010000, 0x400);
++		if (ccu_base) {
++			val = readl(ccu_base + 0x01ac);
++			writel(val | BIT(0), ccu_base + 0x01ac);
++			iounmap(ccu_base);
++		}
++
++		ccu_base = ioremap(0x07060000 + 8 * 0x1000, 0x1000);
++		if (ccu_base) {
++			if ((readl(ccu_base + 0x0008) & GENMASK(3, 0)) != 0x8) {
++				writel(0x8, ccu_base + 0x0000);
++				usleep_range(1000, 2000);
++			}
++			dev_info(dev, "[DWC3-PPU] USB2 status=0x%08x\n",
++				 readl(ccu_base + 0x0008));
++			iounmap(ccu_base);
++		}
+ 	}
+ 
+ 	if (!dwc3_core_is_valid(dwc)) {

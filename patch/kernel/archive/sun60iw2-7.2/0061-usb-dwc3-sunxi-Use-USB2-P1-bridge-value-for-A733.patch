@@ -1,0 +1,40 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Juanesf <juanesf91@users.noreply.github.com>
+Date: Mon, 9 Nov 2026 00:00:00 +0000
+Subject: [PATCH] usb: dwc3: sunxi: use the USB2 P1 bridge value on A733
+
+The A733 DWC3 instance is wired to the USB 2.0 PHY. The subsystem
+bridge needs bit 4 (USB2P0 PHY reset deassert), bits 16/17 (AHB/AXI
+transport clocks) and bit 21 (60 MHz UTMI clock), i.e. 0x00230010.
+Writing 0x00330033 leaves the USB3 PIPE clock path selected and makes
+the xHCI setup time out.
+
+Signed-off-by: Juanesf <juanesf91@users.noreply.github.com>
+---
+ drivers/phy/allwinner/sunxi-cadence-combophy.c | 2 +-
+ drivers/usb/dwc3/core.c                        | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/phy/allwinner/sunxi-cadence-combophy.c b/drivers/phy/allwinner/sunxi-cadence-combophy.c
+--- a/drivers/phy/allwinner/sunxi-cadence-combophy.c
++++ b/drivers/phy/allwinner/sunxi-cadence-combophy.c
+@@ -4247,5 +4247,5 @@ static int sunxi_cadence_combophy_init(struct phy *phy)
+ 			iounmap(ccu_base);
+ 		}
+-		writel(0x00330033, sunxi_cphy->top_subsys_reg + SUBSYS_USB3P1_BGR);
++		writel(0x00230010, sunxi_cphy->top_subsys_reg + SUBSYS_USB3P1_BGR);
+ 		writel(0x20000000, sunxi_cphy->top_subsys_reg + 0x00F0);
+ 	}
+ 
+diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
+--- a/drivers/usb/dwc3/core.c
++++ b/drivers/usb/dwc3/core.c
+@@ -2325,7 +2325,7 @@ static int dwc3_core_init(struct dwc3 *dwc)
+ 		/* 2. Subsystem Bus Gating & Routing */
+ 		subsys_base = ioremap(0x06C00000, 0x1000);
+ 		if (subsys_base) {
+-			writel(0x00330033, subsys_base + 0x0008); /* SUBSYS_USB3P1_BGR: ungate USB3.1 clocks and deassert bus resets */
++			writel(0x00230010, subsys_base + 0x0008); /* SUBSYS_USB3P1_BGR: USB2 P1 PHY reset, clocks, UTMI */
+ 			writel(0x20000000, subsys_base + 0x00F0); /* SUBSYS_DBG_CTL: disable debug test mux */
+ 			dev_info(dev, "[DWC3-SUBSYS-MMIO] 0x06c00008=0x%08x 0x06c000f0=0x%08x\n",
+ 				 readl(subsys_base + 0x0008), readl(subsys_base + 0x00F0));

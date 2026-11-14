@@ -1,0 +1,90 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Juanesf <juanesf91@users.noreply.github.com>
+Date: Tue, 11 Nov 2026 00:00:00 +0000
+Subject: [PATCH] phy: allwinner: sunxi-plat: enable the USB2.0 PHY DCAP clock
+
+The A733 USB2.0 femtoPHY's register window is clocked by CLK_RES_DCAP_24M
+(CCU + 0x1a00, bit 3).  The device tree used to wire the "res_dcap" clock
+to the fixed 24 MHz oscillator, so the clock framework never enabled the
+CCU gate and the PHY registers read back as zero.  Allow the driver to
+take the real CCU clock and enable it around the PHY power-up sequence.
+
+While there, match the host firmware's U2P0 PHYCTL value: VBUSVLDEXTSEL
+is set together with VBUSVLDEXT so the PHY takes VBUS from the board's
+always-on regulator instead of its own comparator.
+
+Signed-off-by: Juanesf <juanesf91@users.noreply.github.com>
+---
+ drivers/phy/allwinner/phy-sunxi-plat.c | 34 ++++++++++++++++++++++++++++++----
+ 1 file changed, 30 insertions(+), 4 deletions(-)
+
+--- a/drivers/phy/allwinner/phy-sunxi-plat.c
++++ b/drivers/phy/allwinner/phy-sunxi-plat.c
+@@ -113,6 +113,7 @@
+ 	void __iomem *res;
+ 	struct reset_control *reset;
+ 	struct clk *clk;
++	struct clk *clk_res_dcap;
+ 	struct regulator *vbus;
+ 	const struct sunxi_phy_of_data *drvdata;
+ 	__u32 param;		/* USB2.0 PHY Tune Param */
+@@ -217,7 +218,7 @@
+ 
+ 	val = readl(PHY_REG_U2_PHYCTL(phy->u2));
+ 	if (phy->drvdata->has_vbusvldext)
+-		tmp = OTGDISABLE | VBUSVLDEXT;
++		tmp = OTGDISABLE | VBUSVLDEXT | VBUSVLDEXTSEL;
+ 	if (enable) {
+ 		val |= tmp;
+ 		val &= ~SIDDQ; /* write 0 to enable phy */
+@@ -249,6 +250,20 @@
+ 			return ret;
+ 	}
+ 
++	/*
++	 * The DCAP clock is the mclk of the USB2.0 PHY's MMIO window.  With
++	 * it gated the U2P0 registers read back as zero and every write is
++	 * dropped, so it has to be on before phy_u2_set() touches them.
++	 */
++	if (phy->clk_res_dcap) {
++		ret = clk_prepare_enable(phy->clk_res_dcap);
++		if (ret) {
++			if (!IS_ERR(phy->clk))
++				clk_disable_unprepare(phy->clk);
++			return ret;
++		}
++	}
++
+ 	phy_res_set(phy, true);
+ 	phy_u2_set(phy, true);
+ 
+@@ -271,6 +286,9 @@
+ 	phy_u2_set(phy, false);
+ 	phy_res_set(phy, false);
+ 
++	if (phy->clk_res_dcap)
++		clk_disable_unprepare(phy->clk_res_dcap);
++
+ 	if (!IS_ERR(phy->clk))
+ 		clk_disable_unprepare(phy->clk);
+ 
+@@ -310,6 +328,19 @@
+ 			sunxi_debug(dev, "failed to get phy clock\n");
+ 	}
+ 
++	/*
++	 * Optional 24 MHz clock for the PHY register window.  Older SoCs
++	 * describe "res_dcap" as a fixed external clock, so a missing clock
++	 * is not an error.
++	 */
++	phy->clk_res_dcap = devm_clk_get_optional(dev, "res_dcap");
++	if (IS_ERR(phy->clk_res_dcap)) {
++		ret = PTR_ERR(phy->clk_res_dcap);
++		if (ret != -EPROBE_DEFER)
++			dev_err(dev, "failed to get res_dcap clock: %d\n", ret);
++		return ret;
++	}
++
+ 	phy->reset = devm_reset_control_get(dev, NULL);
+ 	if (IS_ERR(phy->reset))
+ 		sunxi_debug(dev, "failed to get reset control\n");

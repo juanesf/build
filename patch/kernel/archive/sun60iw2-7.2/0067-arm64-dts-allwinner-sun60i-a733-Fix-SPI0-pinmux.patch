@@ -1,0 +1,26 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Juanesf <juanesf91@users.noreply.github.com>
+Date: Thu, 12 Nov 2026 00:00:00 +0000
+Subject: [PATCH] arm64: dts: allwinner: sun60i-a733: fix SPI0 pinmux
+
+The SPI0 pins on the A733 use pinmux 4 on the PC bank, the same value
+the A523 uses for the same pins.  The current value 5 selects a
+different function, which leaves MISO floating and makes the SPI NOR
+probe fail with an all-zero JEDEC ID.
+
+Signed-off-by: Juanesf <juanesf91@users.noreply.github.com>
+---
+ arch/arm64/boot/dts/allwinner/sun60i-a733.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+--- a/arch/arm64/boot/dts/allwinner/sun60i-a733.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun60i-a733.dtsi
+@@ -448,7 +448,7 @@
+ 			spi0_pc_pins: spi0-pc-pins {
+ 				pins = "PC2", "PC3", "PC4", "PC12";
+ 				function = "spi0";
+-				allwinner,pinmux = <5>;
++				allwinner,pinmux = <4>;
+ 			};
+ 
+ 			spi1_ph_pins: spi1-ph-pins {

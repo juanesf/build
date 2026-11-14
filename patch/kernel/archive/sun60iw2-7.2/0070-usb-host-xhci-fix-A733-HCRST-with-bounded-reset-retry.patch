@@ -1,0 +1,161 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Juanesf <juanesf91@users.noreply.github.com>
+Date: Sat, 14 Nov 2026 00:00:00 +0000
+Subject: [PATCH] usb: host: xhci: fix A733 HCRST timeout with a bounded reset retry
+
+On the Allwinner A733, USBCMD.HCRST only completes when
+SERDES_SUBSYS_APP + 0x0008 holds 0x00030010 (bit 21,
+USB3P1_USB2P0_UTMI_CLK_SEL, clear), selecting the U2P0 femtoPHY as the
+USB2 UTMI clock source.
+
+The first xHCI probe can run before sunxi-cadence-combophy has enabled
+the SerDes 1.8 V supply and clocks.  Until then the SerDes is gated and
+writes to its register file are silently dropped, so HCRST times out
+with -ETIMEDOUT ("can't setup: -110").  Two approaches were measured on
+a Radxa Cubie A7A:
+
+  * Deferring the probe (-EPROBE_DEFER) until U2P0_PHYSTS bit 3 is set
+    removes the -110 but leaves xhci-hcd.0.auto permanently in
+    devices_deferred: the driver core does not retry this platform
+    device reliably on this board.  A manual bind afterwards succeeds
+    immediately, which proves the hardware is ready by then.
+  * Re-asserting the word only in xhci_reset() is not sufficient either,
+    because that write also happens before the SerDes is powered.
+
+Fix it without depending on probe retries:
+
+  * xhci_plat_probe() re-asserts the word early but never defers.
+  * xhci_reset() re-asserts the word immediately before CMD_RESET, keeps
+    the first handshake short (1 s) on A733, and on failure re-asserts
+    the word again and retries with the full timeout.  By then
+    sunxi-cadence-combophy has powered the SerDes, so the write sticks
+    and the controller comes out of reset.
+
+Measured on the board: no -110, no permanently deferred probe, both
+root hubs register and the on-board Terminus hub (1a40:0101)
+enumerates.  The word is idempotent, so later xhci_reset() calls
+(resume, error recovery) are unaffected.
+
+NOTE: this is out-of-tree board-enablement glue. Before any upstream
+submission the hard-coded SoC register accesses must be replaced by
+DT-described clock/reset/power-domain/PHY providers and the probe
+ordering must be expressed as a DT dependency (fw_devlink).
+
+Signed-off-by: Juanesf <juanesf91@users.noreply.github.com>
+---
+ drivers/usb/host/xhci.c | 58 ++++++++++++++++++++++++++++++++++++++++-
+ drivers/usb/host/xhci-plat.c | 20 ++++++++++++++++++++
+ 2 files changed
+
+diff --git a/drivers/usb/host/xhci.c b/drivers/usb/host/xhci.c
+--- a/drivers/usb/host/xhci.c
++++ b/drivers/usb/host/xhci.c
+@@ -199,6 +199,25 @@
+ 	}
+ 
+ 	xhci_dbg_trace(xhci, trace_xhci_dbg_init, "// Reset the HC");
++
++#ifdef CONFIG_ARCH_SUNXI
++	/*
++	 * Allwinner A733: the USB2 port is clocked from the U2P0 femtoPHY,
++	 * which requires SERDES_SUBSYS_APP + 0x0008 bit 21
++	 * (USB3P1_USB2P0_UTMI_CLK_SEL) to be clear.  Re-assert the golden
++	 * word 0x00030010 immediately before CMD_RESET so it wins over any
++	 * later SerDes programming.
++	 */
++	if (of_machine_is_compatible("allwinner,sun60i-a733")) {
++		void __iomem *serdes = ioremap(0x06c00000, 0x1000);
++
++		if (serdes) {
++			writel(0x00030010, serdes + 0x0008);
++			iounmap(serdes);
++		}
++	}
++#endif
++
+ 	command = readl(&xhci->op_regs->command);
+ 	command |= CMD_RESET;
+ 	writel(command, &xhci->op_regs->command);
+@@ -213,7 +232,44 @@
+ 	if (xhci->quirks & XHCI_INTEL_HOST)
+ 		udelay(1000);
+ 
+-	ret = xhci_handshake(&xhci->op_regs->command, CMD_RESET, 0, timeout_us);
++	{
++		u64 first_timeout = timeout_us;
++
++#ifdef CONFIG_ARCH_SUNXI
++		/*
++		 * On A733 the first probe can run before
++		 * sunxi-cadence-combophy has enabled the SerDes supplies
++		 * and clocks; writes to a gated SerDes are dropped, so
++		 * HCRST times out.  Keep the first handshake short, then
++		 * re-assert the word (now that the SerDes is powered) and
++		 * retry with the full timeout.  A -EPROBE_DEFER was tried
++		 * instead and measured to leave the controller
++		 * permanently in devices_deferred.
++		 */
++		if (of_machine_is_compatible("allwinner,sun60i-a733"))
++			first_timeout = min_t(u64, timeout_us, 1000000);
++#endif
++
++		ret = xhci_handshake(&xhci->op_regs->command, CMD_RESET, 0,
++				     first_timeout);
++
++#ifdef CONFIG_ARCH_SUNXI
++		if (ret &&
++		    of_machine_is_compatible("allwinner,sun60i-a733")) {
++			void __iomem *serdes = ioremap(0x06c00000, 0x1000);
++
++			if (serdes) {
++				writel(0x00030010, serdes + 0x0008);
++				iounmap(serdes);
++			}
++			writel(command, &xhci->op_regs->command);
++			if (xhci->quirks & XHCI_INTEL_HOST)
++				udelay(1000);
++			ret = xhci_handshake(&xhci->op_regs->command,
++					     CMD_RESET, 0, timeout_us);
++		}
++#endif
++	}
+ 	if (ret)
+ 		return ret;
+ 
+diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+--- a/drivers/usb/host/xhci-plat.c
++++ b/drivers/usb/host/xhci-plat.c
+@@ -9,6 +9,7 @@
+  */
+ 
+ #include <linux/clk.h>
++#include <linux/io.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/module.h>
+ #include <linux/pci.h>
+@@ -168,6 +169,25 @@
+ 	if (usb_disabled())
+ 		return -ENODEV;
+ 
++#ifdef CONFIG_ARCH_SUNXI
++	/*
++	 * Allwinner A733: re-assert SERDES_SUBSYS_APP + 0x0008 early.  Do
++	 * not defer this probe based on a PHY status bit: measured on the
++	 * board, a -EPROBE_DEFER here leaves xhci-hcd.0.auto permanently in
++	 * devices_deferred (the driver core does not retry it reliably),
++	 * while the SerDes is in fact ready a moment later.  xhci_reset()
++	 * re-asserts the word again and retries HCRST if needed.
++	 */
++	if (of_machine_is_compatible("allwinner,sun60i-a733")) {
++		void __iomem *serdes = ioremap(0x06c00000, 0x1000);
++
++		if (serdes) {
++			writel(0x00030010, serdes + 0x0008);
++			iounmap(serdes);
++		}
++	}
++#endif
++
+ 	driver = &xhci_plat_hc_driver;
+ 
+ 	irq = platform_get_irq(pdev, 0);
