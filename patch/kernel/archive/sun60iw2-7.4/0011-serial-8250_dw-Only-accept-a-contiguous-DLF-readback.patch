@@ -1,0 +1,51 @@
+From 1ff7c327125e7beafe919443cfebcf72f9e3a438 Mon Sep 17 00:00:00 2001
+From: Vinicius Pedrosa <vinicius.eduardo.pedrosa@gmail.com>
+Date: Mon, 19 Oct 2026 17:06:11 -0300
+Subject: [PATCH 11/21] serial: 8250_dw: Only accept a contiguous DLF readback
+
+dw8250_setup_port() writes all ones to offset 0xc0 and treats any
+nonzero readback as the DLF register. DLF is a bit field starting at
+bit 0, so a real one reads back as a contiguous 2^n - 1 mask. On some
+Allwinner SoCs offset 0xc0 is the RS485 control register instead
+(UART_485_CTL in the A733 User Manual), whose implemented bits are not
+contiguous. The probe still takes its readback for a DLF of fls(readback)
+bits, and every later divisor change writes the fractional divisor into
+the RS485 control register.
+
+Only accept a readback of the form 2^n - 1.
+
+The probe itself is unchanged: it still writes all ones to offset 0xc0
+and then restores the old value, so this only changes how the readback
+is interpreted.
+
+The A733 reads back 0x19f, and Andre Przywara observed 0x9f on the
+A523. Without this check the A733 RS485 control register reads 0xb after
+boot; with it, the register stays 0 across 300 termios toggle and
+restore cycles.
+
+Suggested-by: Andre Przywara <andre.przywara@arm.com>
+Signed-off-by: Vinicius Pedrosa <vinicius.eduardo.pedrosa@gmail.com>
+---
+ drivers/tty/serial/8250/8250_dwlib.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/tty/serial/8250/8250_dwlib.c b/drivers/tty/serial/8250/8250_dwlib.c
+index 325793f20..1b0192efe 100644
+--- a/drivers/tty/serial/8250/8250_dwlib.c
++++ b/drivers/tty/serial/8250/8250_dwlib.c
+@@ -225,7 +225,11 @@ void dw8250_setup_port(struct uart_port *p)
+ 	reg = dw8250_readl_ext(p, DW_UART_DLF);
+ 	dw8250_writel_ext(p, DW_UART_DLF, old_dlf);
+ 
+-	if (reg) {
++	/*
++	 * DLF is a bit field starting at bit 0, so a real one reads back as
++	 * 2^n - 1. Any other value means this offset is something else.
++	 */
++	if (reg && !(reg & (reg + 1))) {
+ 		pd->dlf_size = fls(reg);
+ 		p->get_divisor = dw8250_get_divisor;
+ 		/* Keep a hook the driver has already installed */
+-- 
+2.53.0
+

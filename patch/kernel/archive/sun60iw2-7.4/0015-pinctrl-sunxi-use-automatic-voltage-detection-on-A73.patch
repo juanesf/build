@@ -1,0 +1,120 @@
+From 70fa0012af9bfa63e1a25a11e2ea83143f7c4878 Mon Sep 17 00:00:00 2001
+From: Enzo Adriano <enzo.adriano.code@gmail.com>
+Date: Mon, 9 Nov 2026 21:11:36 -0500
+Subject: [PATCH 15/21] pinctrl: sunxi: use automatic voltage detection on A733
+
+A733 uses two-bit voltage-mode fields, but the handlers selected when
+v7.4-rc1 added A733 support program them as one-bit fields. The R-PIO
+handler also writes an A523 control register absent on A733.
+
+Add BIAS_VOLTAGE_PIO_POW_AUTO to select auto (01) in every field of
+POW_MOD_SEL at controller init and skip per-pin voltage setup. Use it
+for both A733 controllers: the A733 User Manual v1.00 documents 01 as
+auto in sections 18.14.6.1 and 18.14.7.20. Give A733-R a separate
+descriptor so A523-R keeps its existing voltage handling.
+
+Fixes: 0535bfbfa97b ("pinctrl: sunxi: add support for the Allwinner A733")
+Fixes: 31d68e10381c ("pinctrl: sunxi: a523-r: add a733-r compatible string")
+Link: https://lore.kernel.org/r/20261107000135.6b684277@ryzen.lan
+Suggested-by: Andre Przywara <andre.przywara@arm.com>
+Suggested-by: Vinicius Pedrosa <vinicius.eduardo.pedrosa@gmail.com>
+Signed-off-by: Enzo Adriano <enzo.adriano.code@gmail.com>
+Tested-by: Vinicius Pedrosa <vinicius.eduardo.pedrosa@gmail.com> # Radxa Cubie A7Z
+---
+ drivers/pinctrl/sunxi/pinctrl-sun55i-a523-r.c | 19 +++++++++++++++----
+ drivers/pinctrl/sunxi/pinctrl-sun60i-a733.c   |  2 +-
+ drivers/pinctrl/sunxi/pinctrl-sunxi.c         |  7 ++++++-
+ drivers/pinctrl/sunxi/pinctrl-sunxi.h         |  2 ++
+ 4 files changed, 24 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun55i-a523-r.c b/drivers/pinctrl/sunxi/pinctrl-sun55i-a523-r.c
+index cffc1e53e..006754c06 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun55i-a523-r.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun55i-a523-r.c
+@@ -30,17 +30,28 @@ static struct sunxi_pinctrl_desc a523_r_pinctrl_data = {
+ 	.pin_base = PL_BASE,
+ };
+ 
++static struct sunxi_pinctrl_desc a733_r_pinctrl_data = {
++	.irq_banks = ARRAY_SIZE(a523_r_irq_bank_map),
++	.irq_bank_map = a523_r_irq_bank_map,
++	.io_bias_cfg_variant = BIAS_VOLTAGE_PIO_POW_AUTO,
++	.pin_base = PL_BASE,
++};
++
+ static int a523_r_pinctrl_probe(struct platform_device *pdev)
+ {
++	struct sunxi_pinctrl_desc *desc;
++
++	desc = (struct sunxi_pinctrl_desc *)of_device_get_match_data(&pdev->dev);
+ 	return sunxi_pinctrl_dt_table_init(pdev, a523_r_nr_bank_pins,
+-					   a523_r_irq_bank_muxes,
+-					   &a523_r_pinctrl_data,
++					   a523_r_irq_bank_muxes, desc,
+ 					   SUNXI_PINCTRL_NCAT2_REG_LAYOUT);
+ }
+ 
+ static const struct of_device_id a523_r_pinctrl_match[] = {
+-	{ .compatible = "allwinner,sun55i-a523-r-pinctrl", },
+-	{ .compatible = "allwinner,sun60i-a733-r-pinctrl", },
++	{ .compatible = "allwinner,sun55i-a523-r-pinctrl",
++	  .data = &a523_r_pinctrl_data },
++	{ .compatible = "allwinner,sun60i-a733-r-pinctrl",
++	  .data = &a733_r_pinctrl_data },
+ 	{}
+ };
+ 
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun60i-a733.c b/drivers/pinctrl/sunxi/pinctrl-sun60i-a733.c
+index ca82f08a3..e095abbb7 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun60i-a733.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun60i-a733.c
+@@ -24,7 +24,7 @@ static const u8 a733_irq_bank_muxes[SUNXI_PINCTRL_MAX_BANKS] =
+ static struct sunxi_pinctrl_desc a733_pinctrl_data = {
+ 	.irq_banks = 10,
+ 	.irq_read_needs_mux = true,
+-	.io_bias_cfg_variant = BIAS_VOLTAGE_PIO_POW_MODE_SEL,
++	.io_bias_cfg_variant = BIAS_VOLTAGE_PIO_POW_AUTO,
+ };
+ 
+ static int a733_pinctrl_probe(struct platform_device *pdev)
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+index bf4ec4665..e54ed9e0b 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+@@ -732,7 +732,8 @@ static int sunxi_pinctrl_set_io_bias_cfg(struct sunxi_pinctrl *pctl,
+ 	u32 val, reg;
+ 	int uV;
+ 
+-	if (!pctl->desc->io_bias_cfg_variant)
++	if (pctl->desc->io_bias_cfg_variant == BIAS_VOLTAGE_NONE ||
++	    pctl->desc->io_bias_cfg_variant == BIAS_VOLTAGE_PIO_POW_AUTO)
+ 		return 0;
+ 
+ 	uV = regulator_get_voltage(supply);
+@@ -1655,6 +1656,10 @@ int sunxi_pinctrl_init_with_flags(struct platform_device *pdev,
+ 	if (IS_ERR(clk))
+ 		return PTR_ERR(clk);
+ 
++	/* Select auto (01) for every bank, including shared VCC-IO. */
++	if (desc->io_bias_cfg_variant == BIAS_VOLTAGE_PIO_POW_AUTO)
++		writel(0x55555555, pctl->membase + pctl->pow_mod_sel_offset);
++
+ 	/*
+ 	 * Seed the output latch shadow from the hardware so pins the
+ 	 * bootloader left in output mode keep their state; see
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.h b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
+index 7c2f29e75..7b36c5c22 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sunxi.h
++++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
+@@ -130,6 +130,8 @@ enum sunxi_desc_bias_voltage {
+ 	 */
+ 	BIAS_VOLTAGE_PIO_POW_MODE_CTL,
+ 	BIAS_VOLTAGE_PIO_POW_MODE_CTL_INV,
++	/* Two-bit PIO_POW_MOD_SEL fields set to automatic voltage detection. */
++	BIAS_VOLTAGE_PIO_POW_AUTO,
+ };
+ 
+ struct sunxi_desc_function {
+-- 
+2.53.0
+

@@ -1,0 +1,56 @@
+From 2fc657718d7773d9835caead99c2b357c8a7ec9d Mon Sep 17 00:00:00 2001
+From: Enzo Adriano <enzo.adriano.code@gmail.com>
+Date: Thu, 12 Nov 2026 16:38:09 -0500
+Subject: [PATCH 09/21] clk: sunxi-ng: a733: Keep SCP firmware bus clocks
+ enabled
+
+The A733 PRCM's bus-r-riscv and bus-r-msgbox gates have no Linux
+consumers, so unused-clock cleanup gates them. With vendor SCP firmware
+running on the E902 as shipped on Cubie A7S, warm reboot then stalls.
+
+Keep both critical until remoteproc/mailbox drivers can claim them.
+This follows A523 bus-r-cpucfg in commit 1dba74abf3e2 ("clk: sunxi-ng:
+Mark A523 bus-r-cpucfg clock as critical") and the temporary SCPI firmware
+clock protection for Meson AXG fclk_div3 in drivers/clk/meson/axg.c.
+
+On Cubie A7S with vendor boot0/BL31/SCP/U-Boot and without
+clk_ignore_unused, warm reboot returns with both clocks critical and
+stalls without them. Vinicius found either flag alone insufficient on
+Cubie A7Z. Power-off, suspend, single flags on A7S, other
+boards/firmware and upstream TF-A were not tested.
+
+Link: https://lore.kernel.org/r/20261005183038.417798-1-vinicius.eduardo.pedrosa@gmail.com
+Signed-off-by: Enzo Adriano <enzo.adriano.code@gmail.com>
+---
+ drivers/clk/sunxi-ng/ccu-sun60i-a733-r.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/clk/sunxi-ng/ccu-sun60i-a733-r.c b/drivers/clk/sunxi-ng/ccu-sun60i-a733-r.c
+index b8f6e8c6e..f2965daba 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun60i-a733-r.c
++++ b/drivers/clk/sunxi-ng/ccu-sun60i-a733-r.c
+@@ -108,7 +108,9 @@ static SUNXI_CCU_DUALDIV_MUX_GATE(r_spi_clk, "r-spi", r_spi_parents, 0x150,
+ 				  0);
+ static SUNXI_CCU_GATE_HW(bus_r_spi_clk, "bus-r-spi", &r_ahb_clk.common.hw, 0x15c, BIT(0), 0);
+ 
+-static SUNXI_CCU_GATE_HW(bus_r_msgbox_clk, "bus-r-msgbox", &r_ahb_clk.common.hw, 0x17c, BIT(0), 0);
++/* Vendor SCP firmware on E902 needs this until a remoteproc/mailbox driver claims it. */
++static SUNXI_CCU_GATE_HW(bus_r_msgbox_clk, "bus-r-msgbox", &r_ahb_clk.common.hw,
++			 0x17c, BIT(0), CLK_IS_CRITICAL);
+ 
+ static SUNXI_CCU_GATE_HW(bus_r_uart0_clk, "bus-r-uart0", &r_apb1_clk.common.hw, 0x18c, BIT(0), 0);
+ static SUNXI_CCU_GATE_HW(bus_r_uart1_clk, "bus-r-uart1", &r_apb1_clk.common.hw, 0x18c, BIT(1), 0);
+@@ -146,8 +148,9 @@ static SUNXI_CCU_MUX_DATA_WITH_GATE(r_riscv_clk, "r-riscv", r_riscv_parents, 0x2
+ 				  24, 2,	/* mux */
+ 				  BIT(31),	/* gate */
+ 				  0);
++/* Vendor SCP firmware on E902 needs this until a remoteproc/mailbox driver claims it. */
+ static SUNXI_CCU_GATE_HW(bus_r_riscv_clk, "bus-r-riscv", &r_apb0_clk.common.hw,
+-			 0x21c, BIT(0), 0);
++			 0x21c, BIT(0), CLK_IS_CRITICAL);
+ static SUNXI_CCU_GATE_HW(bus_r_riscv_cfg_clk, "bus-r-riscv-cfg", &r_apb0_clk.common.hw,
+ 			 0x21c, BIT(1), 0);
+ 
+-- 
+2.53.0
+
