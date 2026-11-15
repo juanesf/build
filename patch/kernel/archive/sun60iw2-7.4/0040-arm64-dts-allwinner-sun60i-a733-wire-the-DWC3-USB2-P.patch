@@ -1,0 +1,70 @@
+From bc82e22ed3a4ecb912ee5faa0988759888a85c23 Mon Sep 17 00:00:00 2001
+From: Juan Sanchez <juanesf91@gmail.com>
+Date: Sun, 15 Nov 2026 15:44:47 -0300
+Subject: [PATCH 40/40] arm64: dts: allwinner: sun60i-a733: wire the DWC3 USB2
+ PHY
+
+The DWC3 USB2 port is served by a third USB2 PHY instance whose register
+window lives at 0x06b00000 (U2P0 femtoPHY, ISCR at +0x00 and PHYCTL at
++0x10, matching REG_PHYCTL_A33 of the sun4i-usb driver). Add its pmu2
+window, the CLK_USB2_U2_REF bus clock and a reset to the existing usbphy
+node, and reference it from dwc3 with phys/phy-names.
+
+This follows the mainline A523 USB3.0 series (patchwork 247), which also
+describes a third usbphy cell and references it from the DWC3 node. The
+driver needs no change: phy-sun4i-usb derives num_phys from the presence
+of usb<N>_reset, and dwc3_core_init() calls phy_init() before the core
+soft reset, so fw_devlink now guarantees the PHY is initialised before
+the xHCI reset.
+
+The SERDES reset line is used for usb2_reset because RST_BUS_USB2 is
+already claimed (shared) by the DWC3 reset array; the U2P0 femtoPHY sits
+inside the SERDES subsystem (User Manual V0.92, figure 18-3). The
+SERDES+0x08 mux word is deliberately left as programmed by the firmware:
+with 0x00330033 the xHCI controller probes correctly.
+
+Signed-off-by: Juan Sanchez <juanesf91@gmail.com>
+---
+ arch/arm64/boot/dts/allwinner/sun60i-a733.dtsi | 18 ++++++++++++------
+ 1 file changed, 12 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733.dtsi b/arch/arm64/boot/dts/allwinner/sun60i-a733.dtsi
+index 452624c68..0142e9137 100644
+--- a/arch/arm64/boot/dts/allwinner/sun60i-a733.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun60i-a733.dtsi
+@@ -526,13 +526,17 @@ usbphy: phy@4100400 {
+ 				     "allwinner,sun20i-d1-usb-phy";
+ 			reg = <0x04100400 0x100>,
+ 			      <0x04101800 0x100>,
+-			      <0x04200800 0x100>;
+-			reg-names = "phy_ctrl", "pmu0", "pmu1";
+-			clocks = <&osc>, <&osc>;
+-			clock-names = "usb0_phy", "usb1_phy";
++			      <0x04200800 0x100>,
++			      <0x06b00000 0x800>;
++			reg-names = "phy_ctrl", "pmu0", "pmu1", "pmu2";
++			clocks = <&osc>, <&osc>,
++				 <&ccu CLK_USB2_U2_REF>;
++			clock-names = "usb0_phy", "usb1_phy", "usb2_phy";
+ 			resets = <&ccu RST_USB_PHY0>,
+-				 <&ccu RST_USB_PHY1>;
+-			reset-names = "usb0_reset", "usb1_reset";
++				 <&ccu RST_USB_PHY1>,
++				 <&ccu RST_BUS_SERDES>;
++			reset-names = "usb0_reset", "usb1_reset",
++				      "usb2_reset";
+ 			#phy-cells = <1>;
+ 			status = "disabled";
+ 		};
+@@ -607,6 +611,8 @@ dwc3: usb@6a00000 {
+ 			reset-names = "bus", "dwc3";
+ 			maximum-speed = "high-speed";
+ 			dr_mode = "host";
++			phys = <&usbphy 2>;
++			phy-names = "usb2-phy";
+ 			snps,dis_u2_susphy_quirk;
+ 			snps,dis_u3_susphy_quirk;
+ 			status = "disabled";
+-- 
+2.53.0
+

@@ -1,7 +1,7 @@
-From 98680db501b308a603ae8c25268331daaa80c81d Mon Sep 17 00:00:00 2001
+From bceb75b9db722a0473eaca6a6aa93ef320f74b5b Mon Sep 17 00:00:00 2001
 From: Jerome Brunet <jbrunet@baylibre.com>
 Date: Thu, 10 Sep 2026 12:44:35 +0200
-Subject: [PATCH 24/38] mfd: axp20x: Constify axp313 and axp717 cells
+Subject: [PATCH 24/40] mfd: axp20x: Constify axp313 and axp717 cells
 
 mfd_cells array should generally be const and there does not seem to be
 anything against it for the axp313 and axp717.

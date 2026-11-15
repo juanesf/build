@@ -1,7 +1,7 @@
-From e054f778b270f936d5d85d3b90ccd2cd9942a9e1 Mon Sep 17 00:00:00 2001
+From 7e902774010805c144254f171e1ced788940d962 Mon Sep 17 00:00:00 2001
 From: Jerome Brunet <jbrunet@baylibre.com>
 Date: Wed, 23 Sep 2026 22:47:32 +0200
-Subject: [PATCH 33/38] net: stmmac: sun55i: Add per-compatible match data
+Subject: [PATCH 33/40] net: stmmac: sun55i: Add per-compatible match data
 
 The A733 GMAC210 glue registers are in a dedicated MMIO region of the
 controller rather than in a syscon, at a different offset.

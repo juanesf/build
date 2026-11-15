@@ -1,7 +1,7 @@
-From e8bf349c2b77907661b4d193fc660bb4fc1c5455 Mon Sep 17 00:00:00 2001
+From 8c7004bb7ae901a34029d324961da7a10b3e67be Mon Sep 17 00:00:00 2001
 From: Enzo Adriano <enzo.adriano.code@gmail.com>
 Date: Mon, 9 Nov 2026 23:45:23 -0500
-Subject: [PATCH 18/38] arm64: dts: allwinner: add Radxa Cubie A7S board
+Subject: [PATCH 18/40] arm64: dts: allwinner: add Radxa Cubie A7S board
 
 Enable the Cubie A7S serial console, PMIC and microSD slot to provide
 an initial usable board configuration. Supply the 26 MHz crystal and

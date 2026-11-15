@@ -1,7 +1,7 @@
-From afa42a2ffce73c2a4f462c1a2536f6eef0ffd95e Mon Sep 17 00:00:00 2001
+From 8e46561d224b5f6fc931fd7ad9f07033350dee3e Mon Sep 17 00:00:00 2001
 From: Jerome Brunet <jbrunet@baylibre.com>
 Date: Wed, 23 Sep 2026 22:47:35 +0200
-Subject: [PATCH 36/38] net: stmmac: sun55i: Add support for Allwinner A733
+Subject: [PATCH 36/40] net: stmmac: sun55i: Add support for Allwinner A733
  GMAC210
 
 The A733 GMAC210 is a DesignWare MAC 5.20 using an Allwinner glue close to

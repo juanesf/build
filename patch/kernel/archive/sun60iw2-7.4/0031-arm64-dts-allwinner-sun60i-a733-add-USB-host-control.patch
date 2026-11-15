@@ -1,7 +1,7 @@
-From 8ddc28c900c3b2579fb0ef662c9c94730232393d Mon Sep 17 00:00:00 2001
+From 07f4bbd36ef772f078edc1b134feb45e8c2f4eeb Mon Sep 17 00:00:00 2001
 From: Juan Sanchez <juanesf91@gmail.com>
 Date: Sun, 15 Nov 2026 03:23:09 -0300
-Subject: [PATCH 31/38] arm64: dts: allwinner: sun60i-a733: add USB host
+Subject: [PATCH 31/40] arm64: dts: allwinner: sun60i-a733: add USB host
  controllers
 
 The A733 DTSI imported from the patchwork series describes no USB node at

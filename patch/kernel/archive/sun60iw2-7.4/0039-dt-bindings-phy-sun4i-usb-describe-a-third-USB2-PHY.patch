@@ -1,0 +1,74 @@
+From b9b622d20f96eee6fd7df58fdc112f0af9797258 Mon Sep 17 00:00:00 2001
+From: Juan Sanchez <juanesf91@gmail.com>
+Date: Sun, 15 Nov 2026 15:44:47 -0300
+Subject: [PATCH 39/40] dt-bindings: phy: sun4i-usb: describe a third USB2 PHY
+
+Some Allwinner SoCs (A523, A733) route the USB2 port of the DWC3
+controller through a third instance of the sun4i USB2 PHY block, with
+its own PMU register window, bus clock and reset line. Describe those
+optional entries so the A733 board can reference <&usbphy 2>.
+
+The minimum number of entries stays at the current values, so existing
+users keep validating unchanged.
+
+Signed-off-by: Juan Sanchez <juanesf91@gmail.com>
+---
+ .../bindings/phy/allwinner,sun50i-a64-usb-phy.yaml   | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/phy/allwinner,sun50i-a64-usb-phy.yaml b/Documentation/devicetree/bindings/phy/allwinner,sun50i-a64-usb-phy.yaml
+index da4ad6fb3..8d657f574 100644
+--- a/Documentation/devicetree/bindings/phy/allwinner,sun50i-a64-usb-phy.yaml
++++ b/Documentation/devicetree/bindings/phy/allwinner,sun50i-a64-usb-phy.yaml
+@@ -27,36 +27,48 @@ properties:
+           - const: allwinner,sun20i-d1-usb-phy
+ 
+   reg:
++    minItems: 3
+     items:
+       - description: PHY Control registers
+       - description: PHY PMU0 registers
+       - description: PHY PMU1 registers
++      - description: PHY PMU2 registers (USB2 PHY of the DWC3 controller)
+ 
+   reg-names:
++    minItems: 3
+     items:
+       - const: phy_ctrl
+       - const: pmu0
+       - const: pmu1
++      - const: pmu2
+ 
+   clocks:
++    minItems: 2
+     items:
+       - description: USB OTG PHY bus clock
+       - description: USB Host 0 PHY bus clock
++      - description: DWC3 USB2 PHY bus clock
+ 
+   clock-names:
++    minItems: 2
+     items:
+       - const: usb0_phy
+       - const: usb1_phy
++      - const: usb2_phy
+ 
+   resets:
++    minItems: 2
+     items:
+       - description: USB OTG reset
+       - description: USB Host 1 Controller reset
++      - description: DWC3 USB2 PHY reset
+ 
+   reset-names:
++    minItems: 2
+     items:
+       - const: usb0_reset
+       - const: usb1_reset
++      - const: usb2_reset
+ 
+   usb0_id_det-gpios:
+     maxItems: 1
+-- 
+2.53.0
+
