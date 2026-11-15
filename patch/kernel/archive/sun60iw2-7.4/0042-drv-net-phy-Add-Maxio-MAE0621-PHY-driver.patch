@@ -1,4 +1,4 @@
-From 3944c0eec6655a51f0e31b589b8a7b05303c717c Mon Sep 17 00:00:00 2001
+From 869496978f03dfd2e308eb129377cf8ac46f443a Mon Sep 17 00:00:00 2001
 From: KickPi <dev@kickpi.com>
 Date: Wed, 23 Sep 2026 14:00:00 +0800
 Subject: [PATCH 42/43] drv: net: phy: Add Maxio MAE0621 PHY driver
@@ -27,6 +27,9 @@ reset with an unconfigured PHY.
 
 Ported from rockchip64 general-drv-net-phy-Add-maxio-phys-driver.patch
 https://github.com/zuyih/linux-cubie
+[Juan Sanchez: rebased to v7.4-rc2. __stmmac_open() no longer has an
+ init_error label; return directly, as the adjacent stmmac_hw_setup()
+ failure path does. 7.4 already resumes the PHY via phylink_prepare_resume().]
 ---
  .../net/ethernet/stmicro/stmmac/stmmac_main.c |  41 ++
  drivers/net/phy/Kconfig                       |   5 +
@@ -36,7 +39,7 @@ https://github.com/zuyih/linux-cubie
  create mode 100644 drivers/net/phy/maxio.c
 
 diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
-index 3014f9c7c..c174663bc 100644
+index 3014f9c7c..50259549b 100644
 --- a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
 +++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
 @@ -57,6 +57,9 @@
@@ -66,7 +69,7 @@ index 3014f9c7c..c174663bc 100644
 +				netdev_err(priv->dev,
 +					   "PHY initialization failed: %d\n",
 +					   ret);
-+				goto init_error;
++				return ret;
 +			}
 +		}
 +	}
