@@ -1,7 +1,7 @@
-From 5deed150e11739410859d04d6812062958a6d9c8 Mon Sep 17 00:00:00 2001
+From 0cf8adeb4c8347c30cc88934c44e547cb2f3a601 Mon Sep 17 00:00:00 2001
 From: Junhui Liu <junhui.liu@pigmoral.tech>
 Date: Thu, 12 Nov 2026 15:11:57 +0800
-Subject: [PATCH 08/21] clk: sunxi-ng: a733: Add reset lines
+Subject: [PATCH 08/29] clk: sunxi-ng: a733: Add reset lines
 
 Add the reset lines for the Allwinner A733 SoC. These reset control bits
 are integrated into the Bus Gate Reset (BGR) registers, typically

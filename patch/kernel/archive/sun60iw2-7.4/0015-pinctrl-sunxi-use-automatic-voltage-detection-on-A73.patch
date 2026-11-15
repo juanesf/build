@@ -1,7 +1,7 @@
-From 70fa0012af9bfa63e1a25a11e2ea83143f7c4878 Mon Sep 17 00:00:00 2001
+From 89ca9be8b7433476eac236453a83737cb3351ead Mon Sep 17 00:00:00 2001
 From: Enzo Adriano <enzo.adriano.code@gmail.com>
 Date: Mon, 9 Nov 2026 21:11:36 -0500
-Subject: [PATCH 15/21] pinctrl: sunxi: use automatic voltage detection on A733
+Subject: [PATCH 15/29] pinctrl: sunxi: use automatic voltage detection on A733
 
 A733 uses two-bit voltage-mode fields, but the handlers selected when
 v7.4-rc1 added A733 support program them as one-bit fields. The R-PIO

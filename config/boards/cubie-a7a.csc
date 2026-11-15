@@ -23,8 +23,24 @@ enable_extension "radxa-aic8800"
 
 # The kernel's parallel dtbs_install target can race while creating the
 # vendor subdirectory. Pre-create it to keep the install step deterministic.
+# The kernel's parallel dtbs_install target uses "install -D" for every DTB.
+# With -j24 two jobs can try to mkdir the same vendor directory at once and
+# install(1) fails with "cannot create directory .../dtbs/<vendor>". Pre-create
+# every first-level dts directory so install only ever creates files, never
+# directories. Applies to mainline 7.4 as well as the old 7.2 vendor tree.
 function kernel_make_config__cubie_a7a_precreate_dtbs_dirs() {
-	if [[ -n "${kernel_dest_install_dir:-}" ]]; then
-		mkdir -p "${kernel_dest_install_dir}/dtbs/allwinner/overlay"
+	[[ -n "${kernel_dest_install_dir:-}" ]] || return 0
+
+	local dts_root="${kernel_work_dir:-${SRC}/cache/sources/${LINUXSOURCEDIR}}/arch/arm64/boot/dts"
+	local dest="${kernel_dest_install_dir}/dtbs"
+	local d
+
+	mkdir -p "${dest}"
+	if [[ -d "${dts_root}" ]]; then
+		for d in "${dts_root}"/*/; do
+			[[ -d "${d}" ]] || continue
+			mkdir -p "${dest}/$(basename "${d}")"
+		done
 	fi
+	mkdir -p "${dest}/allwinner/overlay"
 }

@@ -1,0 +1,116 @@
+From 8071c4071599561cd2de718249dbd4429b9c9282 Mon Sep 17 00:00:00 2001
+From: Vinicius Pedrosa <vinicius.eduardo.pedrosa@gmail.com>
+Date: Sat, 14 Nov 2026 21:44:42 -0300
+Subject: [PATCH 23/29] phy: sun4i-usb: clear SIDDQ before the PHY reset on
+ A733
+
+sun4i_usb_phy_init() deasserts the PHY reset first and clears SIDDQ in
+the PMU HCI_PHY_CTL register afterwards. The order comes from the H3
+support and the reason for it isn't documented.
+
+On a Cubie A7Z (A733), the Wi-Fi module on USB1 sometimes came up
+at full speed on the OHCI companion and failed enumeration with -62.
+This happened in 3 of 40 warm boots with a separate local PHY tuning
+change applied.
+
+With that tuning disabled, the current order failed once in 31 warm
+boots. Clearing SIDDQ before releasing reset had no failures in 60
+warm boots in the same interleaved run, or in 10 cold boots.
+Why the order matters is not understood.
+
+The vendor BSP clears SIDDQ while the PHY is still in reset, in its
+common host path.
+
+Add a config flag for the early clear and set it only for the A733,
+whose config is otherwise the D1 one. The other SoCs keep the current
+order: the manuals don't specify one and they weren't tested.
+
+Signed-off-by: Vinicius Pedrosa <vinicius.eduardo.pedrosa@gmail.com>
+---
+ drivers/phy/allwinner/phy-sun4i-usb.c | 35 +++++++++++++++++++++++----
+ 1 file changed, 30 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/phy/allwinner/phy-sun4i-usb.c b/drivers/phy/allwinner/phy-sun4i-usb.c
+index f26eed0db..7525f75a1 100644
+--- a/drivers/phy/allwinner/phy-sun4i-usb.c
++++ b/drivers/phy/allwinner/phy-sun4i-usb.c
+@@ -105,6 +105,7 @@ struct sun4i_usb_phy_cfg {
+ 	bool phy0_dual_route;
+ 	bool needs_phy2_siddq;
+ 	bool siddq_in_base;
++	bool siddq_before_reset;
+ 	bool poll_vbusen;
+ 	int missing_phys;
+ };
+@@ -253,6 +254,19 @@ static void sun4i_usb_phy_passby(struct sun4i_usb_phy *phy, int enable)
+ 	writel(reg_value, phy->pmu);
+ }
+ 
++static void sun4i_usb_phy_clear_hci_phy_ctl(struct sun4i_usb_phy *phy)
++{
++	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
++	u32 val;
++
++	if (!phy->pmu || !data->cfg->hci_phy_ctl_clear)
++		return;
++
++	val = readl(phy->pmu + REG_HCI_PHY_CTL);
++	val &= ~data->cfg->hci_phy_ctl_clear;
++	writel(val, phy->pmu + REG_HCI_PHY_CTL);
++}
++
+ static int sun4i_usb_phy_init(struct phy *_phy)
+ {
+ 	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
+@@ -270,6 +284,10 @@ static int sun4i_usb_phy_init(struct phy *_phy)
+ 		return ret;
+ 	}
+ 
++	/* Some SoCs want SIDDQ cleared while the PHY is still in reset. */
++	if (data->cfg->siddq_before_reset)
++		sun4i_usb_phy_clear_hci_phy_ctl(phy);
++
+ 	ret = reset_control_deassert(phy->reset);
+ 	if (ret) {
+ 		clk_disable_unprepare(phy->clk2);
+@@ -321,11 +339,8 @@ static int sun4i_usb_phy_init(struct phy *_phy)
+ 		clk_disable_unprepare(phy->clk2);
+ 	}
+ 
+-	if (phy->pmu && data->cfg->hci_phy_ctl_clear) {
+-		val = readl(phy->pmu + REG_HCI_PHY_CTL);
+-		val &= ~data->cfg->hci_phy_ctl_clear;
+-		writel(val, phy->pmu + REG_HCI_PHY_CTL);
+-	}
++	if (!data->cfg->siddq_before_reset)
++		sun4i_usb_phy_clear_hci_phy_ctl(phy);
+ 
+ 	if (data->cfg->siddq_in_base) {
+ 		if (phy->index == 0) {
+@@ -1013,6 +1028,15 @@ static const struct sun4i_usb_phy_cfg sun50i_h616_cfg = {
+ 	.siddq_in_base = true,
+ };
+ 
++static const struct sun4i_usb_phy_cfg sun60i_a733_cfg = {
++	.phyctl_offset = REG_PHYCTL_A33,
++	.dedicated_clocks = true,
++	.hci_phy_ctl_clear = PHY_CTL_SIDDQ,
++	.phy0_dual_route = true,
++	.siddq_in_base = true,
++	.siddq_before_reset = true,
++};
++
+ static const struct of_device_id sun4i_usb_phy_of_match[] = {
+ 	{ .compatible = "allwinner,sun4i-a10-usb-phy", .data = &sun4i_a10_cfg },
+ 	{ .compatible = "allwinner,sun5i-a13-usb-phy", .data = &sun5i_a13_cfg },
+@@ -1029,6 +1053,7 @@ static const struct of_device_id sun4i_usb_phy_of_match[] = {
+ 	  .data = &sun50i_a64_cfg},
+ 	{ .compatible = "allwinner,sun50i-h6-usb-phy", .data = &sun50i_h6_cfg },
+ 	{ .compatible = "allwinner,sun50i-h616-usb-phy", .data = &sun50i_h616_cfg },
++	{ .compatible = "allwinner,sun60i-a733-usb-phy", .data = &sun60i_a733_cfg },
+ 	{ .compatible = "allwinner,suniv-f1c100s-usb-phy",
+ 	  .data = &suniv_f1c100s_cfg },
+ 	{ },
+-- 
+2.53.0
+

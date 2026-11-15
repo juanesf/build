@@ -1,7 +1,7 @@
-From 9eaaebace5eb73ff979840acef85964c025c2dda Mon Sep 17 00:00:00 2001
+From 9f8e84123c8aa927ae13646a984524fc1fd7d72e Mon Sep 17 00:00:00 2001
 From: Vinicius Pedrosa <vinicius.eduardo.pedrosa@gmail.com>
 Date: Mon, 19 Oct 2026 17:06:12 -0300
-Subject: [PATCH 12/21] dt-bindings: serial: snps-dw-apb-uart: Add Allwinner
+Subject: [PATCH 12/29] dt-bindings: serial: snps-dw-apb-uart: Add Allwinner
  A733
 
 The Allwinner A733 UART is a DesignWare APB UART, but it needs
