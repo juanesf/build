@@ -1,7 +1,7 @@
-From 4f96a26bccce46f9dde8257eece57896f6bcbd6c Mon Sep 17 00:00:00 2001
+From adc32487d9552a9fe77dba2e0d03d685f38c6b7b Mon Sep 17 00:00:00 2001
 From: Enzo Adriano <enzo.adriano.code@gmail.com>
 Date: Mon, 9 Nov 2026 23:45:20 -0500
-Subject: [PATCH 17/43] arm64: dts: allwinner: add A733 SoC description
+Subject: [PATCH 17/44] arm64: dts: allwinner: add A733 SoC description
 
 Provide the SoC description needed for the Cubie A7S console, PMIC and
 microSD support. Describe the CPUs, PSCI, architectural timers, GIC,

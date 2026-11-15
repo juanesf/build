@@ -1,7 +1,7 @@
-From 869496978f03dfd2e308eb129377cf8ac46f443a Mon Sep 17 00:00:00 2001
+From 9de35555360622457d5cbdfe7e8faa126dfaf455 Mon Sep 17 00:00:00 2001
 From: KickPi <dev@kickpi.com>
 Date: Wed, 23 Sep 2026 14:00:00 +0800
-Subject: [PATCH 42/43] drv: net: phy: Add Maxio MAE0621 PHY driver
+Subject: [PATCH 42/44] drv: net: phy: Add Maxio MAE0621 PHY driver
 
 The KickPi K2B V2 uses Maxio MAE0621A-Q2C (PHY ID 0x7b744411).
 Without this driver the Generic PHY does not program the clock-mode

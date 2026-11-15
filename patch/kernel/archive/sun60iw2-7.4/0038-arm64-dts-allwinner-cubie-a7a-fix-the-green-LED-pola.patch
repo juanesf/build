@@ -1,7 +1,7 @@
-From e404c2b770206eaf2009f6d7c4e8aa21b916269d Mon Sep 17 00:00:00 2001
+From 7cc3b24db1a1ae1ff76cee55297f86e0ddd0cb1a Mon Sep 17 00:00:00 2001
 From: Juan Sanchez <juanesf91@gmail.com>
 Date: Sun, 15 Nov 2026 13:27:11 -0300
-Subject: [PATCH 38/43] arm64: dts: allwinner: cubie-a7a: fix the green LED
+Subject: [PATCH 38/44] arm64: dts: allwinner: cubie-a7a: fix the green LED
  polarity
 
 Sheet 19 of the v1.10 schematic shows LED_GREEN fed from DCDC1 through

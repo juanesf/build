@@ -1,0 +1,87 @@
+From 5688d721f87e3f48d903e81eaa9a5ed7d1e8e959 Mon Sep 17 00:00:00 2001
+From: Juan Sanchez <juanesf91@gmail.com>
+Date: Sun, 15 Nov 2026 18:54:01 -0300
+Subject: [PATCH 39/44] dt-bindings: phy: add the Allwinner A733 U2P0 femtoPHY
+
+The A733 has a dedicated USB2 femtoPHY for the USB2 port of the DWC3
+controller, with resistor calibration registers in the system control
+area and the UTMI clock mux in the SERDES subsystem.
+
+Signed-off-by: Juan Sanchez <juanesf91@gmail.com>
+---
+ .../phy/allwinner,sun60i-a733-u2phy.yaml      | 63 +++++++++++++++++++
+ 1 file changed, 63 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/allwinner,sun60i-a733-u2phy.yaml
+
+diff --git a/Documentation/devicetree/bindings/phy/allwinner,sun60i-a733-u2phy.yaml b/Documentation/devicetree/bindings/phy/allwinner,sun60i-a733-u2phy.yaml
+new file mode 100644
+index 000000000..8b202661f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/allwinner,sun60i-a733-u2phy.yaml
+@@ -0,0 +1,63 @@
++# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
++%YAML 1.2
++---
++$id: http://devicetree.org/schemas/phy/allwinner,sun60i-a733-u2phy.yaml#
++$schema: http://devicetree.org/meta-schemas/core.yaml#
++
++title: Allwinner A733 USB2 femtoPHY (U2P0)
++
++maintainers:
++  - Juan Sanchez <juanesf91@gmail.com>
++
++description: |
++  The Allwinner A733 has a dedicated USB2 femtoPHY for the USB2 port of the
++  DWC3 controller. Its resistor calibration registers live in the system
++  control area and the UTMI clock source is selected in the SERDES subsystem.
++
++properties:
++  compatible:
++    const: allwinner,sun60i-a733-u2phy
++
++  reg:
++    items:
++      - description: U2P0 PHY registers
++      - description: resistor calibration registers
++      - description: SERDES subsystem application registers
++
++  reg-names:
++    items:
++      - const: u2_base
++      - const: res_base
++      - const: serdes
++
++  clocks:
++    maxItems: 1
++
++  clock-names:
++    const: res_dcap
++
++  "#phy-cells":
++    const: 0
++
++required:
++  - compatible
++  - reg
++  - reg-names
++  - clocks
++  - clock-names
++  - "#phy-cells"
++
++additionalProperties: false
++
++examples:
++  - |
++    u2phy: phy@6b00000 {
++        compatible = "allwinner,sun60i-a733-u2phy";
++        reg = <0x06b00000 0x800>,
++              <0x03000000 0x300>,
++              <0x06c00000 0x400>;
++        reg-names = "u2_base", "res_base", "serdes";
++        clocks = <&ccu 265>;
++        clock-names = "res_dcap";
++        #phy-cells = <0>;
++    };
+-- 
+2.53.0
+

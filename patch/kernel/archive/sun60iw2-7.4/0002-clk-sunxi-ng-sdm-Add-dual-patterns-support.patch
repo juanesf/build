@@ -1,7 +1,7 @@
-From fb49b2b3ba9d3d8b4542e6b94894a3e98ce6c26e Mon Sep 17 00:00:00 2001
+From 1605ad90f0797724e192ed2c090e9151fe13815f Mon Sep 17 00:00:00 2001
 From: Junhui Liu <junhui.liu@pigmoral.tech>
 Date: Thu, 12 Nov 2026 15:11:51 +0800
-Subject: [PATCH 02/43] clk: sunxi-ng: sdm: Add dual patterns support
+Subject: [PATCH 02/44] clk: sunxi-ng: sdm: Add dual patterns support
 
 On newer Allwinner platforms like the A733, the Sigma-Delta Modulation
 (SDM) control logic is more complex. The SDM enable bit, which was

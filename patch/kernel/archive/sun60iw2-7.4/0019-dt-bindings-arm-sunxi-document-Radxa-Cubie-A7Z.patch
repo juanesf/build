@@ -1,7 +1,7 @@
-From 737469c5b77e93b55ad74c9c529b89a4116a0160 Mon Sep 17 00:00:00 2001
+From 7e37a5f050131eb98386bbf5b014d4ae7de0d214 Mon Sep 17 00:00:00 2001
 From: Vinicius Pedrosa <vinicius.eduardo.pedrosa@gmail.com>
 Date: Wed, 11 Nov 2026 10:49:15 -0300
-Subject: [PATCH 19/43] dt-bindings: arm: sunxi: document Radxa Cubie A7Z
+Subject: [PATCH 19/44] dt-bindings: arm: sunxi: document Radxa Cubie A7Z
 
 Document the Radxa Cubie A7Z, an Allwinner A733-based board.
 

@@ -1,7 +1,7 @@
-From 558235964c6eea777f2f9b94e88a3f8f5ba1d138 Mon Sep 17 00:00:00 2001
+From 22e72a2a21931fa5aa78fd586e64c96272870d6e Mon Sep 17 00:00:00 2001
 From: Juan Sanchez <juanesf91@gmail.com>
 Date: Sat, 14 Nov 2026 21:48:39 -0300
-Subject: [PATCH 29/43] arm64: dts: allwinner: add Radxa Cubie A7A
+Subject: [PATCH 29/44] arm64: dts: allwinner: add Radxa Cubie A7A
 
 Add a board device tree for the Radxa Cubie A7A (Allwinner A733 / sun60iw2),
 based on the mainline A733 SoC description and the Cubie A7Z board DTS.

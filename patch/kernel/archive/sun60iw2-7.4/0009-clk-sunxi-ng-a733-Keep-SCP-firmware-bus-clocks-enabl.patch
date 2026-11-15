@@ -1,7 +1,7 @@
-From e17d1abde3abb2771211b30264ae13479b9271cd Mon Sep 17 00:00:00 2001
+From ff0a7004ea467ed3f225cc382f14703e92a170b2 Mon Sep 17 00:00:00 2001
 From: Enzo Adriano <enzo.adriano.code@gmail.com>
 Date: Thu, 12 Nov 2026 16:38:09 -0500
-Subject: [PATCH 09/43] clk: sunxi-ng: a733: Keep SCP firmware bus clocks
+Subject: [PATCH 09/44] clk: sunxi-ng: a733: Keep SCP firmware bus clocks
  enabled
 
 The A733 PRCM's bus-r-riscv and bus-r-msgbox gates have no Linux

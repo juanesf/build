@@ -1,7 +1,7 @@
-From 85623f3f401a58059ef3ed56d8dc7f7e1a8b8944 Mon Sep 17 00:00:00 2001
+From d8c8e30d7870d633382e288ed12e37fcf52ed600 Mon Sep 17 00:00:00 2001
 From: Jerome Brunet <jbrunet@baylibre.com>
 Date: Wed, 23 Sep 2026 22:47:33 +0200
-Subject: [PATCH 34/43] net: stmmac: sun55i: Make the delay step configurable
+Subject: [PATCH 34/44] net: stmmac: sun55i: Make the delay step configurable
 
 The driver assumes a 100ps step for both TX and RX clock delays, which
 does not match the A733 GMAC210.

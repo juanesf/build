@@ -1,7 +1,7 @@
-From c9fb08cbd850c2dfda889adb11b59360b504900a Mon Sep 17 00:00:00 2001
+From e2085896812431686a1cd261fc22b0882a38b588 Mon Sep 17 00:00:00 2001
 From: Vinicius Pedrosa <vinicius.eduardo.pedrosa@gmail.com>
 Date: Mon, 19 Oct 2026 17:06:13 -0300
-Subject: [PATCH 13/43] serial: 8250_dw: Add Allwinner A733 UART
+Subject: [PATCH 13/44] serial: 8250_dw: Add Allwinner A733 UART
 
 On the A733, dw8250_set_termios() stops the UART clock around
 clk_set_rate() on every termios change that reaches the driver. If TX is

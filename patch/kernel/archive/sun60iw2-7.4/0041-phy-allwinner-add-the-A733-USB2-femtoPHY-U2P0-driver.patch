@@ -1,0 +1,229 @@
+From b36c0467edf1199b3b26a7e77f5402b2d17ae4f7 Mon Sep 17 00:00:00 2001
+From: Juan Sanchez <juanesf91@gmail.com>
+Date: Sun, 15 Nov 2026 18:54:01 -0300
+Subject: [PATCH 41/44] phy: allwinner: add the A733 USB2 femtoPHY (U2P0)
+ driver
+
+The A733 routes the USB2 port of the DWC3 controller through a dedicated
+femtoPHY at 0x06b00000. The generic sun4i-usb-phy driver used for the
+EHCI/OHCI PHYs only clears SIDDQ there; it does not program the PHY
+calibration or select the UTMI clock source. As a result the DWC3 USB2
+port detects the external hub but every SET_ADDRESS and descriptor read
+fails with -EPROTO (-71).
+
+Add a small, DT-driven PHY driver that enables CLK_RES_DCAP_24M and, in
+phy_init() (which dwc3_core_init() calls before dwc3_core_soft_reset()),
+programs ISCR, PHYCTL, PHYTUNE and the resistor-calibration registers
+with the values used by the vendor BSP (5.15.147-a733), then clears bit
+21 of SERDES_APP+0x08 so the UTMI clock comes from the femtoPHY. Only
+bit 21 is cleared: writing the vendor golden word verbatim makes xHCI
+fail with -110 when no separate combo-PHY driver has run.
+
+The values are fixed per SoC, like the tuning values of other Allwinner
+PHY drivers.
+
+Signed-off-by: Juan Sanchez <juanesf91@gmail.com>
+---
+ drivers/phy/allwinner/Kconfig              |  13 ++
+ drivers/phy/allwinner/Makefile             |   1 +
+ drivers/phy/allwinner/phy-sun60i-a733-u2.c | 158 +++++++++++++++++++++
+ 3 files changed, 172 insertions(+)
+ create mode 100644 drivers/phy/allwinner/phy-sun60i-a733-u2.c
+
+diff --git a/drivers/phy/allwinner/Kconfig b/drivers/phy/allwinner/Kconfig
+index fb584518b..514c43b46 100644
+--- a/drivers/phy/allwinner/Kconfig
++++ b/drivers/phy/allwinner/Kconfig
+@@ -57,3 +57,16 @@ config PHY_SUN50I_USB3
+ 	  part of Allwinner H6 SoC.
+ 
+ 	  This driver controls each individual USB 2+3 host PHY combo.
++
++config PHY_SUN60I_A733_U2
++	tristate "Allwinner A733 USB2 femtoPHY (U2P0) driver"
++	depends on ARCH_SUNXI || COMPILE_TEST
++	depends on HAS_IOMEM && OF
++	depends on COMMON_CLK
++	select GENERIC_PHY
++	help
++	  Enable this to support the USB2 femtoPHY that drives the USB2 port
++	  of the DWC3 controller on the Allwinner A733 SoC.
++
++	  This driver programs the PHY calibration registers and selects the
++	  femtoPHY as the UTMI clock source before the DWC3 core soft reset.
+diff --git a/drivers/phy/allwinner/Makefile b/drivers/phy/allwinner/Makefile
+index bd74901a1..21ca5f2ec 100644
+--- a/drivers/phy/allwinner/Makefile
++++ b/drivers/phy/allwinner/Makefile
+@@ -3,3 +3,4 @@ obj-$(CONFIG_PHY_SUN4I_USB)		+= phy-sun4i-usb.o
+ obj-$(CONFIG_PHY_SUN6I_MIPI_DPHY)	+= phy-sun6i-mipi-dphy.o
+ obj-$(CONFIG_PHY_SUN9I_USB)		+= phy-sun9i-usb.o
+ obj-$(CONFIG_PHY_SUN50I_USB3)		+= phy-sun50i-usb3.o
++obj-$(CONFIG_PHY_SUN60I_A733_U2)	+= phy-sun60i-a733-u2.o
+diff --git a/drivers/phy/allwinner/phy-sun60i-a733-u2.c b/drivers/phy/allwinner/phy-sun60i-a733-u2.c
+new file mode 100644
+index 000000000..bf668ced9
+--- /dev/null
++++ b/drivers/phy/allwinner/phy-sun60i-a733-u2.c
+@@ -0,0 +1,158 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * Allwinner A733 USB2 femtoPHY (U2P0) driver.
++ *
++ * The A733 routes the USB2 port of the DWC3 controller through a dedicated
++ * femtoPHY at 0x06b00000, with its resistor-calibration registers in the
++ * system-control area and the UTMI clock mux in the adjacent SERDES block.
++ * The generic sun4i-usb-phy driver (used for the two EHCI/OHCI PHYs) does
++ * not program this block: it only clears SIDDQ. Without the calibration
++ * below the DWC3 USB2 port detects the external hub but every SET_ADDRESS /
++ * descriptor read fails with -EPROTO (-71).
++ *
++ * The register values are the ones programmed by the vendor BSP
++ * (5.15.147-a733, drivers/phy/sunxi-plat-phy) with the hub enumerating at
++ * 480 Mbps. They are fixed for this SoC, like the tuning values of other
++ * Allwinner PHY drivers (e.g. phy-sun50i-usb3.c).
++ */
++
++#include <linux/bits.h>
++#include <linux/clk.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/phy/phy.h>
++#include <linux/platform_device.h>
++
++/* U2P0 register window (0x06b00000) */
++#define U2P0_ISCR		0x00
++#define U2P0_PHYCTL		0x10
++#define U2P0_PHYTUNE		0x18
++
++/* SERDES subsystem application registers (0x06c00000) */
++#define SERDES_APP_CFG			0x08
++#define SERDES_APP_UTMI_CLK_SEL	BIT(21)	/* 1: CCU, 0: femtoPHY */
++
++/* Resistor calibration window (0x03000000), offsets from the vendor driver */
++
++#define RES_CAL_160		0x160
++#define RES_CAL_164		0x164
++#define RES_CAL_168		0x168
++
++#define U2P0_ISCR_VAL		0x02000000
++#define U2P0_PHYCTL_VAL		0x000e2430
++#define U2P0_PHYTUNE_VAL	0x143338d6
++#define RES_CAL_160_VAL		0x00c81532
++#define RES_CAL_164_VAL		0x00c80000
++#define RES_CAL_168_VAL		0xc8c80000
++
++struct sun60i_a733_u2phy {
++	void __iomem *u2_base;
++	void __iomem *res_base;
++	void __iomem *serdes;
++	struct clk *res_dcap;
++};
++
++static int sun60i_a733_u2phy_init(struct phy *phy)
++{
++	struct sun60i_a733_u2phy *p = phy_get_drvdata(phy);
++	u32 val;
++	int ret;
++
++	ret = clk_prepare_enable(p->res_dcap);
++	if (ret)
++		return ret;
++
++	/* Program the femtoPHY before the DWC3 core soft reset (HCRST). */
++	writel(U2P0_ISCR_VAL, p->u2_base + U2P0_ISCR);
++	writel(U2P0_PHYCTL_VAL, p->u2_base + U2P0_PHYCTL);
++	writel(U2P0_PHYTUNE_VAL, p->u2_base + U2P0_PHYTUNE);
++
++	writel(RES_CAL_160_VAL, p->res_base + RES_CAL_160);
++	writel(RES_CAL_164_VAL, p->res_base + RES_CAL_164);
++	writel(RES_CAL_168_VAL, p->res_base + RES_CAL_168);
++
++	/*
++	 * Select the femtoPHY as the UTMI clock source. Clear only bit 21 and
++	 * keep the other bits programmed by the firmware: writing the vendor
++	 * golden word 0x00030010 verbatim makes xHCI fail with -110 because the
++	 * combo PHY is not initialised by a separate driver on mainline.
++	 */
++	val = readl(p->serdes + SERDES_APP_CFG);
++	val &= ~SERDES_APP_UTMI_CLK_SEL;
++	writel(val, p->serdes + SERDES_APP_CFG);
++
++	return 0;
++}
++
++static int sun60i_a733_u2phy_exit(struct phy *phy)
++{
++	struct sun60i_a733_u2phy *p = phy_get_drvdata(phy);
++
++	clk_disable_unprepare(p->res_dcap);
++	return 0;
++}
++
++static const struct phy_ops sun60i_a733_u2phy_ops = {
++	.init	= sun60i_a733_u2phy_init,
++	.exit	= sun60i_a733_u2phy_exit,
++	.owner	= THIS_MODULE,
++};
++
++static int sun60i_a733_u2phy_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct sun60i_a733_u2phy *p;
++	struct phy_provider *provider;
++	struct phy *phy;
++
++	p = devm_kzalloc(dev, sizeof(*p), GFP_KERNEL);
++	if (!p)
++		return -ENOMEM;
++
++	p->u2_base = devm_platform_ioremap_resource_byname(pdev, "u2_base");
++	if (IS_ERR(p->u2_base))
++		return PTR_ERR(p->u2_base);
++
++	p->res_base = devm_platform_ioremap_resource_byname(pdev, "res_base");
++	if (IS_ERR(p->res_base))
++		return PTR_ERR(p->res_base);
++
++	p->serdes = devm_platform_ioremap_resource_byname(pdev, "serdes");
++	if (IS_ERR(p->serdes))
++		return PTR_ERR(p->serdes);
++
++	p->res_dcap = devm_clk_get(dev, "res_dcap");
++	if (IS_ERR(p->res_dcap))
++		return dev_err_probe(dev, PTR_ERR(p->res_dcap),
++				     "failed to get res_dcap clock\n");
++
++	phy = devm_phy_create(dev, NULL, &sun60i_a733_u2phy_ops);
++	if (IS_ERR(phy))
++		return dev_err_probe(dev, PTR_ERR(phy),
++				     "failed to create PHY\n");
++
++	phy_set_drvdata(phy, p);
++
++	provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
++	return PTR_ERR_OR_ZERO(provider);
++}
++
++static const struct of_device_id sun60i_a733_u2phy_of_match[] = {
++	{ .compatible = "allwinner,sun60i-a733-u2phy" },
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, sun60i_a733_u2phy_of_match);
++
++static struct platform_driver sun60i_a733_u2phy_driver = {
++	.probe	= sun60i_a733_u2phy_probe,
++	.driver	= {
++		.name		= "sun60i-a733-u2phy",
++		.of_match_table	= sun60i_a733_u2phy_of_match,
++	},
++};
++module_platform_driver(sun60i_a733_u2phy_driver);
++
++MODULE_AUTHOR("Juan Sanchez <juanesf91@gmail.com>");
++MODULE_DESCRIPTION("Allwinner A733 USB2 femtoPHY (U2P0) driver");
++MODULE_LICENSE("GPL");
+-- 
+2.53.0
+
