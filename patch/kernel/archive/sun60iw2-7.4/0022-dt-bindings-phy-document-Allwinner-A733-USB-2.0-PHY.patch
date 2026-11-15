@@ -1,4 +1,4 @@
-From 30715a385a220a658d6bb19470a997b4a2ad7cd9 Mon Sep 17 00:00:00 2001
+From ddc4ab65d298c79a684ec6080215d23a1e0141bf Mon Sep 17 00:00:00 2001
 From: Vinicius Pedrosa <vinicius.eduardo.pedrosa@gmail.com>
 Date: Thu, 29 Oct 2026 14:23:24 -0300
 Subject: [PATCH 22/30] dt-bindings: phy: document Allwinner A733 USB-2.0 PHY

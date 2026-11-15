@@ -1,4 +1,4 @@
-From d953d3b947571f272524284e927551e86539bf74 Mon Sep 17 00:00:00 2001
+From 1d50ff2bdf59025ab320e1d2dcce25994b8fc11c Mon Sep 17 00:00:00 2001
 From: Enzo Adriano <enzo.adriano.code@gmail.com>
 Date: Mon, 9 Nov 2026 23:45:18 -0500
 Subject: [PATCH 16/30] dt-bindings: arm: sunxi: document Radxa Cubie A7S

@@ -1,4 +1,4 @@
-From bcbfbed6dc8f8184e78cef88d69a8f2c456d57a5 Mon Sep 17 00:00:00 2001
+From 9aa1f36969fc7bd269050e25198db7cdeb8e8dfe Mon Sep 17 00:00:00 2001
 From: Enzo Adriano <enzo.adriano.code@gmail.com>
 Date: Mon, 9 Nov 2026 21:11:36 -0500
 Subject: [PATCH 15/30] pinctrl: sunxi: use automatic voltage detection on A733

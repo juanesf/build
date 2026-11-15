@@ -1,4 +1,4 @@
-From da7e836efc14c018adfe13bb575779801b087dc0 Mon Sep 17 00:00:00 2001
+From 14c5dcca6fa80008a0db3df63a1de312baf394c5 Mon Sep 17 00:00:00 2001
 From: Junhui Liu <junhui.liu@pigmoral.tech>
 Date: Thu, 12 Nov 2026 15:11:53 +0800
 Subject: [PATCH 04/30] clk: sunxi-ng: a733: Add PLL clocks support

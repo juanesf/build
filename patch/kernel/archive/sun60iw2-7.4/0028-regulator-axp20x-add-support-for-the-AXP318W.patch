@@ -1,4 +1,4 @@
-From a228b98a6189d151256def5b0b3928207e6251ae Mon Sep 17 00:00:00 2001
+From b63c9285567196add9bc15fc04619993e0181b3b Mon Sep 17 00:00:00 2001
 From: Andre Przywara <andre.przywara@arm.com>
 Date: Thu, 10 Sep 2026 12:44:39 +0200
 Subject: [PATCH 28/30] regulator: axp20x: add support for the AXP318W
