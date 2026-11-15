@@ -1,7 +1,7 @@
-From 17447d2f4c9c4039bae13c87a79afadd537ca560 Mon Sep 17 00:00:00 2001
+From be99aa9c052f97bfbf7f886a9fd9e675243dfce6 Mon Sep 17 00:00:00 2001
 From: Andre Przywara <andre.przywara@arm.com>
 Date: Thu, 10 Sep 2026 12:44:37 +0200
-Subject: [PATCH 26/29] dt-bindings: mfd: x-powers,axp152: Document AXP318W
+Subject: [PATCH 26/30] dt-bindings: mfd: x-powers,axp152: Document AXP318W
 
 The X-Powers AXP318W is a PMIC used on some newer Allwinner devices.
 Among a large number of both DCDC and LDO regulators it features the usual

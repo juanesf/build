@@ -1,7 +1,7 @@
-From 5d09897e72c2651b8ebc857966826376215ad9a4 Mon Sep 17 00:00:00 2001
+From 30715a385a220a658d6bb19470a997b4a2ad7cd9 Mon Sep 17 00:00:00 2001
 From: Vinicius Pedrosa <vinicius.eduardo.pedrosa@gmail.com>
 Date: Thu, 29 Oct 2026 14:23:24 -0300
-Subject: [PATCH 22/29] dt-bindings: phy: document Allwinner A733 USB-2.0 PHY
+Subject: [PATCH 22/30] dt-bindings: phy: document Allwinner A733 USB-2.0 PHY
 
 The USB 2.0 PHY in the Allwinner A733 works with the D1 settings of
 the sun4i-usb driver. Add its compatible with the D1 fallback, as was

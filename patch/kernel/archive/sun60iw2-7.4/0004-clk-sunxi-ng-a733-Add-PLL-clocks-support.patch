@@ -1,7 +1,7 @@
-From 8daa9a2f444a377087669971dc5f4492bcff8b43 Mon Sep 17 00:00:00 2001
+From da7e836efc14c018adfe13bb575779801b087dc0 Mon Sep 17 00:00:00 2001
 From: Junhui Liu <junhui.liu@pigmoral.tech>
 Date: Thu, 12 Nov 2026 15:11:53 +0800
-Subject: [PATCH 04/29] clk: sunxi-ng: a733: Add PLL clocks support
+Subject: [PATCH 04/30] clk: sunxi-ng: a733: Add PLL clocks support
 
 Add PLL clock support for the main CCU of the Allwinner A733 SoC. The
 structure is mostly similar to the sun55i, with the addition of a

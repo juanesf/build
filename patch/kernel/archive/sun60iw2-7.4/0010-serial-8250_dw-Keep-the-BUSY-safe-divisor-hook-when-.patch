@@ -1,7 +1,7 @@
-From 1426ebd0803e076b4803b8778a97a79a41fe66ea Mon Sep 17 00:00:00 2001
+From 52b9d15500566d91c02e69527ef8e049e4367f1f Mon Sep 17 00:00:00 2001
 From: Vinicius Pedrosa <vinicius.eduardo.pedrosa@gmail.com>
 Date: Mon, 19 Oct 2026 17:06:10 -0300
-Subject: [PATCH 10/29] serial: 8250_dw: Keep the BUSY-safe divisor hook when
+Subject: [PATCH 10/30] serial: 8250_dw: Keep the BUSY-safe divisor hook when
  DLF is present
 
 dw8250_probe() installs dw8250_set_divisor(), which brackets the

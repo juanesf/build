@@ -1,7 +1,7 @@
-From 946e57f020014d6b2bf45fc9dab0d8a011b377d0 Mon Sep 17 00:00:00 2001
+From 4e57325a9ccdbd5921804cf633f9e74fc92f21fe Mon Sep 17 00:00:00 2001
 From: Junhui Liu <junhui.liu@pigmoral.tech>
 Date: Thu, 12 Nov 2026 15:11:50 +0800
-Subject: [PATCH 01/29] dt-bindings: clk: sun60i-a733-ccu: Add Allwinner A733
+Subject: [PATCH 01/30] dt-bindings: clk: sun60i-a733-ccu: Add Allwinner A733
  support
 
 The CCU and R-CCU (PRCM) modules provide clocks and reset functions for

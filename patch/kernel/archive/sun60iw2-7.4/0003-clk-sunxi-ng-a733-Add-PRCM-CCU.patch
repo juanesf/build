@@ -1,7 +1,7 @@
-From bf8182d6180256dc1258ef0d0f43121c5ae5efbd Mon Sep 17 00:00:00 2001
+From cc311d44e1922e92d1e4a5ad7e417471ab6aaccf Mon Sep 17 00:00:00 2001
 From: Junhui Liu <junhui.liu@pigmoral.tech>
 Date: Thu, 12 Nov 2026 15:11:52 +0800
-Subject: [PATCH 03/29] clk: sunxi-ng: a733: Add PRCM CCU
+Subject: [PATCH 03/30] clk: sunxi-ng: a733: Add PRCM CCU
 
 Add support for the Power Reset Clock Management (PRCM) module found in
 the Allwinner A733 SoC. This clock controller manages the clock control

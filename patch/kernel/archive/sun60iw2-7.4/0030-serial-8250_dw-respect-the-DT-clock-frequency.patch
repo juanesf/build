@@ -1,0 +1,41 @@
+From 180e93bc8ce4c1b3b538c4f84f62fbf2b49c1738 Mon Sep 17 00:00:00 2001
+From: Juan Sanchez <juanesf91@gmail.com>
+Date: Sun, 15 Nov 2026 01:05:37 -0300
+Subject: [PATCH 30/30] serial: 8250_dw: respect the DT clock-frequency
+
+uart_read_port_properties() already parses "clock-frequency" into
+port->uartclk. Do not overwrite it with clk_get_rate() when the DT
+provides an explicit rate. This is needed on the Allwinner A733, where
+the UART baud clock is a fixed 24 MHz bus gate whose parent mux is
+programmable, so the rate reported by the CCU driver can differ from
+what the firmware programmed. Combined with clock-frequency in the
+board DTS, this keeps the serial console at 115200 when 8250_dw takes
+over from earlycon.
+
+Signed-off-by: Juan Sanchez <juanesf91@gmail.com>
+---
+ drivers/tty/serial/8250/8250_dw.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/tty/serial/8250/8250_dw.c b/drivers/tty/serial/8250/8250_dw.c
+index 8fb2efef7..61b436683 100644
+--- a/drivers/tty/serial/8250/8250_dw.c
++++ b/drivers/tty/serial/8250/8250_dw.c
+@@ -724,7 +724,13 @@ static int dw8250_probe(struct platform_device *pdev)
+ 		return dev_err_probe(dev, PTR_ERR(data->clk),
+ 				     "failed to get baudclk\n");
+ 
+-	if (data->clk)
++	/* uart_read_port_properties() may have set uartclk from the DT
++	 * "clock-frequency" property. Do not overwrite it with the CCU
++	 * clock rate: on Allwinner A733 the baud clock is a fixed bus
++	 * gate and the rate reported by the clock driver can differ from
++	 * what the firmware actually programmed.
++	 */
++	if (data->clk && !p->uartclk)
+ 		p->uartclk = clk_get_rate(data->clk);
+ 
+ 	/* If no clock rate is defined, fail. */
+-- 
+2.53.0
+

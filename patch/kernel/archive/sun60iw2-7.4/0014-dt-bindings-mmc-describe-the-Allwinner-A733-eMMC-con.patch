@@ -1,7 +1,7 @@
-From 62f4325234e580e47175ce43b05cb93cfd1a4684 Mon Sep 17 00:00:00 2001
+From 05533a986aef55b08bc859b56901420dfc07ba04 Mon Sep 17 00:00:00 2001
 From: Enzo Adriano <enzo.adriano.code@gmail.com>
 Date: Fri, 30 Oct 2026 22:26:47 -0400
-Subject: [PATCH 14/29] dt-bindings: mmc: describe the Allwinner A733 eMMC
+Subject: [PATCH 14/30] dt-bindings: mmc: describe the Allwinner A733 eMMC
  controller
 
 SMHC3 uses a different DMA descriptor format from SMHC0/2: the length

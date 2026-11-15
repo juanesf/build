@@ -1,7 +1,7 @@
-From 1ea0e8603fdceab0cfa69f9b65c59666e81b0214 Mon Sep 17 00:00:00 2001
+From 906c5455c8b79055fc0aeedeeab78cf798f5da44 Mon Sep 17 00:00:00 2001
 From: Jerome Brunet <jbrunet@baylibre.com>
 Date: Thu, 10 Sep 2026 12:44:36 +0200
-Subject: [PATCH 25/29] mfd: axp20x-i2c: Fix i2c instantiation
+Subject: [PATCH 25/30] mfd: axp20x-i2c: Fix i2c instantiation
 
 Apparently this device never really supported i2c instantiation via
 sysfs, because the driver does not even look at the i2c device data,
