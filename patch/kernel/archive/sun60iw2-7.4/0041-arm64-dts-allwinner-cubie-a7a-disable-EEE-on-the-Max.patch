@@ -1,0 +1,48 @@
+From 0bab7247888fd441318d02ca08e59a5d465a77fd Mon Sep 17 00:00:00 2001
+From: Juan Sanchez <juanesf91@gmail.com>
+Date: Sun, 15 Nov 2026 15:56:31 -0300
+Subject: [PATCH 41/43] arm64: dts: allwinner: cubie-a7a: disable EEE on the
+ Maxio PHY
+
+The Cubie A7A uses a Maxio MAE0621A-Q3C PHY (ID 0x7b744412), for which
+mainline has no dedicated driver, so the generic PHY driver binds. With
+EEE advertised the 1Gbps link drops and re-negotiates every few minutes
+(~4 s down, phy_eee_wakeup_error_n incrementing) and NetworkManager
+restarts DHCP on each flap. The vendor MAXIO driver disables both EEE
+modes; the linux-sunxi discussion of this exact PHY confirmed this is the
+known A7A problem ("they disable the two EEE modes that you got problems
+with on the A7A, in the PHY driver").
+
+Use the standard DT flags parsed by phy-core (of_set_phy_eee_broken) so
+the two 100/1000BASE-T EEE modes are no longer advertised. This is the
+mainline equivalent of the vendor workaround and needs no new driver.
+The MAC-side RGMII delays stay untouched: the link is error-free
+(0 CRC / 0 align / 0 FIFO overflow) at 1000 Mb/s Full.
+
+Signed-off-by: Juan Sanchez <juanesf91@gmail.com>
+---
+ arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts
+index ffcc030b5..e242ca560 100644
+--- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts
++++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts
+@@ -187,6 +187,14 @@ ext_rgmii_phy: ethernet-phy@1 {
+ 			reset-gpios = <&pio 7 16 GPIO_ACTIVE_LOW>; /* PH16 */
+ 			reset-assert-us = <10000>;
+ 			reset-deassert-us = <150000>;
++			/*
++			 * MAE0621A-Q3C: the vendor PHY driver disables both
++			 * EEE modes. With the generic PHY driver, leaving EEE
++			 * advertised makes the link drop and re-negotiate
++			 * every few minutes (phy_eee_wakeup_error_n).
++			 */
++			eee-broken-100tx;
++			eee-broken-1000t;
+ 		};
+ 	};
+ };
+-- 
+2.53.0
+

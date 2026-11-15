@@ -1,0 +1,50 @@
+From e11065b984912f3b8535ba6e1f641815d71d8726 Mon Sep 17 00:00:00 2001
+From: Juan Sanchez <juanesf91@gmail.com>
+Date: Sun, 15 Nov 2026 17:45:41 -0300
+Subject: [PATCH 43/43] arm64: dts: allwinner: cubie-a7a: describe the eMMC
+ supplies
+
+The SoC DTSI imported from patchwork leaves mmc2 without vmmc/vqmmc
+supplies, so mmc_regulator_set_ocr() leaves host->ocr_avail empty and the
+eMMC fails with "no support for card's volts" / error -22.
+
+Describe them as on the 7.2 vendor port: ALDO5 ("vcc-emmc", 3.3 V) for
+vmmc and CLDO5 ("vcc18-pf-pc", 1.8 V) for vqmmc, matching the 1.8 V
+HS200 mode. Both regulators exist in the AXP318W driver. The eMMC is
+only detected, never mounted or written by this image.
+
+Signed-off-by: Juan Sanchez <juanesf91@gmail.com>
+---
+ arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts
+index e242ca560..3bc80f08c 100644
+--- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts
++++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts
+@@ -342,6 +342,13 @@ reg_aldo1: aldo1 {
+ 				regulator-always-on;
+ 			};
+ 
++			reg_aldo5: aldo5 {
++				regulator-name = "vcc-emmc";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
+ 			reg_bldo1: bldo1 {
+ 				regulator-name = "vcc-pe-pk-mcsi";
+ 			};
+@@ -436,6 +443,8 @@ &uart0 {
+ };
+ 
+ &mmc2 {
++	vmmc-supply = <&reg_aldo5>;
++	vqmmc-supply = <&reg_cldo5>;
+ 	bus-width = <8>;
+ 	cap-mmc-highspeed;
+ 	mmc-hs200-1_8v;
+-- 
+2.53.0
+

@@ -1,7 +1,7 @@
-From e366d3d7b35fd55c315f3d8ac382bc3fcbadbb3f Mon Sep 17 00:00:00 2001
+From 986a33917dd802eabe2f74b069cd782e69d3188c Mon Sep 17 00:00:00 2001
 From: Andre Przywara <andre.przywara@arm.com>
 Date: Thu, 10 Sep 2026 12:44:38 +0200
-Subject: [PATCH 27/40] mfd: axp20x: Add support for AXP318W PMIC
+Subject: [PATCH 27/43] mfd: axp20x: Add support for AXP318W PMIC
 
 The AXP318W is a PMIC chip produced by X-Powers, it can be connected to
 an I2C bus.

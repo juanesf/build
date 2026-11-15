@@ -1,7 +1,7 @@
-From 2a5196a9e6a3e3d3a5be319dfeb9a08f51e72875 Mon Sep 17 00:00:00 2001
+From 6ffc2678fccb38fd0b1b5fa642f274df0b6c7329 Mon Sep 17 00:00:00 2001
 From: Jerome Brunet <jbrunet@baylibre.com>
 Date: Wed, 23 Sep 2026 22:47:34 +0200
-Subject: [PATCH 35/40] net: stmmac: sun55i: Support TX delay extension bits
+Subject: [PATCH 35/43] net: stmmac: sun55i: Support TX delay extension bits
 
 On the A733 GMAC210, the TX clock delay is 5 bits wide: the 3 low bits are
 in the ETXDC field and the 2 high bits in a separate field.

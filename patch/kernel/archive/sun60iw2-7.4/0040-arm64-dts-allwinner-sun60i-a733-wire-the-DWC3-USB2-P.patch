@@ -1,7 +1,7 @@
-From bc82e22ed3a4ecb912ee5faa0988759888a85c23 Mon Sep 17 00:00:00 2001
+From 70cc125d509611668032c0f17f4792c012bb363d Mon Sep 17 00:00:00 2001
 From: Juan Sanchez <juanesf91@gmail.com>
 Date: Sun, 15 Nov 2026 15:44:47 -0300
-Subject: [PATCH 40/40] arm64: dts: allwinner: sun60i-a733: wire the DWC3 USB2
+Subject: [PATCH 40/43] arm64: dts: allwinner: sun60i-a733: wire the DWC3 USB2
  PHY
 
 The DWC3 USB2 port is served by a third USB2 PHY instance whose register
