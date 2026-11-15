@@ -1,7 +1,7 @@
 From a42cfc6c8ec7b64e82255faa43829704daa9d837 Mon Sep 17 00:00:00 2001
 From: Vinicius Pedrosa <vinicius.eduardo.pedrosa@gmail.com>
 Date: Wed, 11 Nov 2026 10:49:17 -0300
-Subject: [PATCH 21/31] arm64: dts: allwinner: sun60i-a733-cubie-a7z: add the
+Subject: [PATCH 21/38] arm64: dts: allwinner: sun60i-a733-cubie-a7z: add the
  user LED
 
 Describe the green user LED on the Radxa Cubie A7Z. It is driven high

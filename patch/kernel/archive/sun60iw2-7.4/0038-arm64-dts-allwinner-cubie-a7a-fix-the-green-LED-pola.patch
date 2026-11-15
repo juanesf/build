@@ -1,0 +1,44 @@
+From 801fc336a8520f66070b59d48b6ca410d05e2eb1 Mon Sep 17 00:00:00 2001
+From: Juan Sanchez <juanesf91@gmail.com>
+Date: Sun, 15 Nov 2026 13:27:11 -0300
+Subject: [PATCH 38/38] arm64: dts: allwinner: cubie-a7a: fix the green LED
+ polarity
+
+Sheet 19 of the v1.10 schematic shows LED_GREEN fed from DCDC1 through
+R212, with Q11 (FDV301N) connected in parallel as a shunt. Driving its
+gate high turns Q11 on and shorts the LED off; the LED lights when PJ26
+is low. The node was described as active high, so with brightness=1 the
+kernel drove the GPIO high and the LED stayed dark (it only glows for a
+moment at power-on, before any firmware configures the pin).
+
+Use GPIO_ACTIVE_LOW so default-state = "on" actually lights it. The blue
+activity LED is driven directly through R211 and stays active high.
+
+Signed-off-by: Juan Sanchez <juanesf91@gmail.com>
+---
+ arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts
+index 01a8815c6..ffcc030b5 100644
+--- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts
++++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts
+@@ -25,8 +25,13 @@ leds {
+ 		led-power {
+ 			function = LED_FUNCTION_POWER;
+ 			color = <LED_COLOR_ID_GREEN>;
+-			/* PJ26 drives the gate of Q11 (FDV301N), which sinks LED2. */
+-			gpios = <&pio 9 26 GPIO_ACTIVE_HIGH>;
++			/*
++			 * LED2 is fed from DCDC1 through R212, with Q11
++			 * (FDV301N) in parallel as a shunt: driving PJ26
++			 * high turns Q11 on and shorts the LED off. The
++			 * LED is lit when PJ26 is low, so it is active low.
++			 */
++			gpios = <&pio 9 26 GPIO_ACTIVE_LOW>;
+ 			default-state = "on";
+ 		};
+ 
+-- 
+2.53.0
+
