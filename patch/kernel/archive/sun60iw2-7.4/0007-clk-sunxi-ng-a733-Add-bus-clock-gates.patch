@@ -1,7 +1,7 @@
 From 40a096af6f6fd43a5939521bcd223d571dd94354 Mon Sep 17 00:00:00 2001
 From: Junhui Liu <junhui.liu@pigmoral.tech>
 Date: Thu, 12 Nov 2026 15:11:56 +0800
-Subject: [PATCH 07/30] clk: sunxi-ng: a733: Add bus clock gates
+Subject: [PATCH 07/31] clk: sunxi-ng: a733: Add bus clock gates
 
 Add the bus clock gates that control access to the devices' register
 interface on the Allwinner A733 SoC. These clocks are typically

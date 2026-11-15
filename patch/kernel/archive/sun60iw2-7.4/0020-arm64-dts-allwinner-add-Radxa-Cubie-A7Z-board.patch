@@ -1,7 +1,7 @@
 From 8253d7079d3dcbcad3fb2bb6b3d6b142f5792540 Mon Sep 17 00:00:00 2001
 From: Vinicius Pedrosa <vinicius.eduardo.pedrosa@gmail.com>
 Date: Wed, 11 Nov 2026 10:49:16 -0300
-Subject: [PATCH 20/30] arm64: dts: allwinner: add Radxa Cubie A7Z board
+Subject: [PATCH 20/31] arm64: dts: allwinner: add Radxa Cubie A7Z board
 
 Add the device tree for the Radxa Cubie A7Z. Describe UART0, the AXP318W
 PMIC over R-I2C0, MMC0, RTC and the bank supplies. It is based on the
