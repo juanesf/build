@@ -1,4 +1,4 @@
-From d8c8e30d7870d633382e288ed12e37fcf52ed600 Mon Sep 17 00:00:00 2001
+From 699464271583295420ebc88b3ed21759302fc5f2 Mon Sep 17 00:00:00 2001
 From: Jerome Brunet <jbrunet@baylibre.com>
 Date: Wed, 23 Sep 2026 22:47:33 +0200
 Subject: [PATCH 34/44] net: stmmac: sun55i: Make the delay step configurable

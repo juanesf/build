@@ -1,4 +1,4 @@
-From 0a03b899f21af4cd9458b24b761ee71c2c149b00 Mon Sep 17 00:00:00 2001
+From ae7f5859dfdb843ade4c799544992c0ad6665587 Mon Sep 17 00:00:00 2001
 From: Jerome Brunet <jbrunet@baylibre.com>
 Date: Wed, 23 Sep 2026 22:47:34 +0200
 Subject: [PATCH 35/44] net: stmmac: sun55i: Support TX delay extension bits

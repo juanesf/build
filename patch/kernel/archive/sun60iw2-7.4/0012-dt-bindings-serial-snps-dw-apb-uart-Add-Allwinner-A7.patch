@@ -1,4 +1,4 @@
-From 6ea395c50579d943d4e23aafc296404e11826d3f Mon Sep 17 00:00:00 2001
+From a5ffc07a402b5822583d121a09174de699c46442 Mon Sep 17 00:00:00 2001
 From: Vinicius Pedrosa <vinicius.eduardo.pedrosa@gmail.com>
 Date: Mon, 19 Oct 2026 17:06:12 -0300
 Subject: [PATCH 12/44] dt-bindings: serial: snps-dw-apb-uart: Add Allwinner

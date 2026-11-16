@@ -1,4 +1,4 @@
-From be7a99279db62fc786a1f02dd06bc9755d575791 Mon Sep 17 00:00:00 2001
+From 14cc0fd8080b9b68c41b0950f5066a0accf550a3 Mon Sep 17 00:00:00 2001
 From: Jerome Brunet <jbrunet@baylibre.com>
 Date: Wed, 23 Sep 2026 22:47:32 +0200
 Subject: [PATCH 33/44] net: stmmac: sun55i: Add per-compatible match data

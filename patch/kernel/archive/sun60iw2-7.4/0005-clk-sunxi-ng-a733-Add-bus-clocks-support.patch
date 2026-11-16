@@ -1,4 +1,4 @@
-From 8312aa6845f6e094d54ba85e6e4ea399b2a24403 Mon Sep 17 00:00:00 2001
+From a8471567309cbaab0637d4c5bc6e078f488b509b Mon Sep 17 00:00:00 2001
 From: Junhui Liu <junhui.liu@pigmoral.tech>
 Date: Thu, 12 Nov 2026 15:11:54 +0800
 Subject: [PATCH 05/44] clk: sunxi-ng: a733: Add bus clocks support

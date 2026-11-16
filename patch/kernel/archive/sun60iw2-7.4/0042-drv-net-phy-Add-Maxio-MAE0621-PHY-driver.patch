@@ -1,4 +1,4 @@
-From 9de35555360622457d5cbdfe7e8faa126dfaf455 Mon Sep 17 00:00:00 2001
+From 60b83ef0c9aff771179fca9195c6831a431aa23d Mon Sep 17 00:00:00 2001
 From: KickPi <dev@kickpi.com>
 Date: Wed, 23 Sep 2026 14:00:00 +0800
 Subject: [PATCH 42/44] drv: net: phy: Add Maxio MAE0621 PHY driver

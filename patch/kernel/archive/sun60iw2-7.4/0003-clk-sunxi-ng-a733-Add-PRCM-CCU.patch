@@ -1,4 +1,4 @@
-From 543f0467a522d117767627e0f97b6a1e38a2c2d5 Mon Sep 17 00:00:00 2001
+From 9c13d8689d28ae9cb31d1fd53afde1d16f08f9d5 Mon Sep 17 00:00:00 2001
 From: Junhui Liu <junhui.liu@pigmoral.tech>
 Date: Thu, 12 Nov 2026 15:11:52 +0800
 Subject: [PATCH 03/44] clk: sunxi-ng: a733: Add PRCM CCU

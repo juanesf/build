@@ -1,6 +1,6 @@
-From 5688d721f87e3f48d903e81eaa9a5ed7d1e8e959 Mon Sep 17 00:00:00 2001
+From 2b853bffd308d02418150f012a3ebe51b6c516a3 Mon Sep 17 00:00:00 2001
 From: Juan Sanchez <juanesf91@gmail.com>
-Date: Sun, 15 Nov 2026 18:54:01 -0300
+Date: Sun, 15 Nov 2026 21:07:48 -0300
 Subject: [PATCH 39/44] dt-bindings: phy: add the Allwinner A733 U2P0 femtoPHY
 
 The A733 has a dedicated USB2 femtoPHY for the USB2 port of the DWC3

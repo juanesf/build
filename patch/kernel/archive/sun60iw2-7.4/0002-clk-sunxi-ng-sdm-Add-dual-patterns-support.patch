@@ -1,4 +1,4 @@
-From 1605ad90f0797724e192ed2c090e9151fe13815f Mon Sep 17 00:00:00 2001
+From 0d46dcd549215dfdfa0f1f2c25708283bd4dad0d Mon Sep 17 00:00:00 2001
 From: Junhui Liu <junhui.liu@pigmoral.tech>
 Date: Thu, 12 Nov 2026 15:11:51 +0800
 Subject: [PATCH 02/44] clk: sunxi-ng: sdm: Add dual patterns support

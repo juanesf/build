@@ -1,4 +1,4 @@
-From a9ef7899a5b5a55f450ef9779ee4d1b76a367ffc Mon Sep 17 00:00:00 2001
+From 628b7927ef738ffb635f031c7a890bdd73d43c26 Mon Sep 17 00:00:00 2001
 From: Junhui Liu <junhui.liu@pigmoral.tech>
 Date: Thu, 12 Nov 2026 15:11:57 +0800
 Subject: [PATCH 08/44] clk: sunxi-ng: a733: Add reset lines

@@ -1,4 +1,4 @@
-From 1b30c11782b56efaf96ee1b70e3e3b5a76022021 Mon Sep 17 00:00:00 2001
+From f4d67627304ee487243df97b065f230168c706bb Mon Sep 17 00:00:00 2001
 From: Enzo Adriano <enzo.adriano.code@gmail.com>
 Date: Mon, 9 Nov 2026 23:45:23 -0500
 Subject: [PATCH 18/44] arm64: dts: allwinner: add Radxa Cubie A7S board

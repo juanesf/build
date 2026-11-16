@@ -1,4 +1,4 @@
-From e2085896812431686a1cd261fc22b0882a38b588 Mon Sep 17 00:00:00 2001
+From 70e71a290914af9facbf64aa6249b9ba06fa8b60 Mon Sep 17 00:00:00 2001
 From: Vinicius Pedrosa <vinicius.eduardo.pedrosa@gmail.com>
 Date: Mon, 19 Oct 2026 17:06:13 -0300
 Subject: [PATCH 13/44] serial: 8250_dw: Add Allwinner A733 UART

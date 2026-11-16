@@ -1,4 +1,4 @@
-From 0447e530e0a0d8ffded0684422efa6246d73b672 Mon Sep 17 00:00:00 2001
+From 51686f5a94cab33c5c2b4b1438e65c0ec9de7fdb Mon Sep 17 00:00:00 2001
 From: Juan Sanchez <juanesf91@gmail.com>
 Date: Sun, 15 Nov 2026 15:56:31 -0300
 Subject: [PATCH 43/44] arm64: dts: allwinner: cubie-a7a: disable EEE on the

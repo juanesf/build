@@ -1,4 +1,4 @@
-From 04828aeb48068bcf7649fcd91ac6cd5755c14fed Mon Sep 17 00:00:00 2001
+From 16733211d090a70951a1714fc1548c25e8bb8db5 Mon Sep 17 00:00:00 2001
 From: Jerome Brunet <jbrunet@baylibre.com>
 Date: Wed, 23 Sep 2026 22:47:35 +0200
 Subject: [PATCH 36/44] net: stmmac: sun55i: Add support for Allwinner A733

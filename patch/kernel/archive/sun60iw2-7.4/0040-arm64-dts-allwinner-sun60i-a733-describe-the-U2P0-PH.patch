@@ -1,6 +1,6 @@
-From 3013c66d40c4f1c76894f479004421ddcfa9fe7a Mon Sep 17 00:00:00 2001
+From e1fe9be849e1eba417ac0c3dc893e0614bf2381a Mon Sep 17 00:00:00 2001
 From: Juan Sanchez <juanesf91@gmail.com>
-Date: Sun, 15 Nov 2026 18:54:01 -0300
+Date: Sun, 15 Nov 2026 21:07:48 -0300
 Subject: [PATCH 40/44] arm64: dts: allwinner: sun60i-a733: describe the U2P0
  PHY and wire DWC3
 
@@ -12,7 +12,8 @@ not described on this board.
 
 The generic sun4i-usb-phy keeps its two EHCI/OHCI PHYs; it is no longer
 asked to own the U2P0 window. fw_devlink now makes DWC3 wait for the
-U2P0 PHY, whose init runs before the DWC3 core soft reset (HCRST).
+U2P0 PHY. The PHY programming itself is done in phy_power_on(), i.e.
+after the DWC3 core soft reset and before xHCI starts enumerating.
 
 Signed-off-by: Juan Sanchez <juanesf91@gmail.com>
 ---

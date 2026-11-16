@@ -1,6 +1,6 @@
-From b36c0467edf1199b3b26a7e77f5402b2d17ae4f7 Mon Sep 17 00:00:00 2001
+From 20aa5525d905340d52205cc1af52657ebb255b95 Mon Sep 17 00:00:00 2001
 From: Juan Sanchez <juanesf91@gmail.com>
-Date: Sun, 15 Nov 2026 18:54:01 -0300
+Date: Sun, 15 Nov 2026 21:07:48 -0300
 Subject: [PATCH 41/44] phy: allwinner: add the A733 USB2 femtoPHY (U2P0)
  driver
 
@@ -11,13 +11,18 @@ calibration or select the UTMI clock source. As a result the DWC3 USB2
 port detects the external hub but every SET_ADDRESS and descriptor read
 fails with -EPROTO (-71).
 
-Add a small, DT-driven PHY driver that enables CLK_RES_DCAP_24M and, in
-phy_init() (which dwc3_core_init() calls before dwc3_core_soft_reset()),
-programs ISCR, PHYCTL, PHYTUNE and the resistor-calibration registers
-with the values used by the vendor BSP (5.15.147-a733), then clears bit
-21 of SERDES_APP+0x08 so the UTMI clock comes from the femtoPHY. Only
-bit 21 is cleared: writing the vendor golden word verbatim makes xHCI
-fail with -110 when no separate combo-PHY driver has run.
+Add a small, DT-driven PHY driver that enables CLK_RES_DCAP_24M in
+phy_init() and programs ISCR, PHYCTL, PHYTUNE and the resistor-calibration
+registers with the values used by the vendor BSP (5.15.147-a733), then
+clears bit 21 of SERDES_APP+0x08 so the UTMI clock comes from the
+femtoPHY. All register writes happen in phy_power_on(), which
+dwc3_core_init() calls right after dwc3_core_soft_reset() and before xHCI
+is registered. Doing them in phy_init() (before the soft reset) leaves the
+core without a clock and the reset times out with -110: the vendor BSP
+brings up the combo PHY first, but mainline has no combo-PHY driver here.
+
+Only bit 21 is cleared: writing the vendor golden word verbatim makes xHCI
+fail with -110 for the same reason.
 
 The values are fixed per SoC, like the tuning values of other Allwinner
 PHY drivers.
@@ -26,8 +31,8 @@ Signed-off-by: Juan Sanchez <juanesf91@gmail.com>
 ---
  drivers/phy/allwinner/Kconfig              |  13 ++
  drivers/phy/allwinner/Makefile             |   1 +
- drivers/phy/allwinner/phy-sun60i-a733-u2.c | 158 +++++++++++++++++++++
- 3 files changed, 172 insertions(+)
+ drivers/phy/allwinner/phy-sun60i-a733-u2.c | 169 +++++++++++++++++++++
+ 3 files changed, 183 insertions(+)
  create mode 100644 drivers/phy/allwinner/phy-sun60i-a733-u2.c
 
 diff --git a/drivers/phy/allwinner/Kconfig b/drivers/phy/allwinner/Kconfig
@@ -62,10 +67,10 @@ index bd74901a1..21ca5f2ec 100644
 +obj-$(CONFIG_PHY_SUN60I_A733_U2)	+= phy-sun60i-a733-u2.o
 diff --git a/drivers/phy/allwinner/phy-sun60i-a733-u2.c b/drivers/phy/allwinner/phy-sun60i-a733-u2.c
 new file mode 100644
-index 000000000..bf668ced9
+index 000000000..f179fcf41
 --- /dev/null
 +++ b/drivers/phy/allwinner/phy-sun60i-a733-u2.c
-@@ -0,0 +1,158 @@
+@@ -0,0 +1,169 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/*
 + * Allwinner A733 USB2 femtoPHY (U2P0) driver.
@@ -82,6 +87,13 @@ index 000000000..bf668ced9
 + * (5.15.147-a733, drivers/phy/sunxi-plat-phy) with the hub enumerating at
 + * 480 Mbps. They are fixed for this SoC, like the tuning values of other
 + * Allwinner PHY drivers (e.g. phy-sun50i-usb3.c).
++ *
++ * Ordering matters: the vendor BSP brings up the combo PHY (SERDES) before
++ * the DWC3 core, but mainline has no combo-PHY driver here. Clearing the
++ * UTMI clock mux before dwc3_core_soft_reset() leaves the core without a
++ * clock and the reset times out (-110). dwc3_core_init() calls phy_init()
++ * before the soft reset and phy_power_on() right after it, still before
++ * xHCI is registered, so all the programming is done in power_on().
 + */
 +
 +#include <linux/bits.h>
@@ -101,8 +113,7 @@ index 000000000..bf668ced9
 +#define SERDES_APP_CFG			0x08
 +#define SERDES_APP_UTMI_CLK_SEL	BIT(21)	/* 1: CCU, 0: femtoPHY */
 +
-+/* Resistor calibration window (0x03000000), offsets from the vendor driver */
-+
++/* Resistor calibration window (0x03000000) */
 +#define RES_CAL_160		0x160
 +#define RES_CAL_164		0x164
 +#define RES_CAL_168		0x168
@@ -121,17 +132,14 @@ index 000000000..bf668ced9
 +	struct clk *res_dcap;
 +};
 +
-+static int sun60i_a733_u2phy_init(struct phy *phy)
++static int sun60i_a733_u2phy_power_on(struct phy *phy)
 +{
 +	struct sun60i_a733_u2phy *p = phy_get_drvdata(phy);
 +	u32 val;
-+	int ret;
 +
-+	ret = clk_prepare_enable(p->res_dcap);
-+	if (ret)
-+		return ret;
-+
-+	/* Program the femtoPHY before the DWC3 core soft reset (HCRST). */
++	/* Program the femtoPHY after the DWC3 core soft reset, before xHCI
++	 * starts enumerating. See the ordering note at the top of the file.
++	 */
 +	writel(U2P0_ISCR_VAL, p->u2_base + U2P0_ISCR);
 +	writel(U2P0_PHYCTL_VAL, p->u2_base + U2P0_PHYCTL);
 +	writel(U2P0_PHYTUNE_VAL, p->u2_base + U2P0_PHYTUNE);
@@ -153,6 +161,13 @@ index 000000000..bf668ced9
 +	return 0;
 +}
 +
++static int sun60i_a733_u2phy_init(struct phy *phy)
++{
++	struct sun60i_a733_u2phy *p = phy_get_drvdata(phy);
++
++	return clk_prepare_enable(p->res_dcap);
++}
++
 +static int sun60i_a733_u2phy_exit(struct phy *phy)
 +{
 +	struct sun60i_a733_u2phy *p = phy_get_drvdata(phy);
@@ -162,9 +177,10 @@ index 000000000..bf668ced9
 +}
 +
 +static const struct phy_ops sun60i_a733_u2phy_ops = {
-+	.init	= sun60i_a733_u2phy_init,
-+	.exit	= sun60i_a733_u2phy_exit,
-+	.owner	= THIS_MODULE,
++	.init		= sun60i_a733_u2phy_init,
++	.exit		= sun60i_a733_u2phy_exit,
++	.power_on	= sun60i_a733_u2phy_power_on,
++	.owner		= THIS_MODULE,
 +};
 +
 +static int sun60i_a733_u2phy_probe(struct platform_device *pdev)

@@ -1,4 +1,4 @@
-From 5ed69d1c86ffa72a9ec7e17a092a3b93ffe2f64f Mon Sep 17 00:00:00 2001
+From 2b2409b29474a7bcbe8cafc53e90f851cfe7b021 Mon Sep 17 00:00:00 2001
 From: Junhui Liu <junhui.liu@pigmoral.tech>
 Date: Thu, 12 Nov 2026 15:11:56 +0800
 Subject: [PATCH 07/44] clk: sunxi-ng: a733: Add bus clock gates

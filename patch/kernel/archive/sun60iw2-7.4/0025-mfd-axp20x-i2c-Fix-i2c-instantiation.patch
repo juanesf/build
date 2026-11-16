@@ -1,4 +1,4 @@
-From 859a488e7db9fa6f65ac452fdec67d6521bd929d Mon Sep 17 00:00:00 2001
+From a03be903d9380c83ad5d945b11e62d5c1f7a12f8 Mon Sep 17 00:00:00 2001
 From: Jerome Brunet <jbrunet@baylibre.com>
 Date: Thu, 10 Sep 2026 12:44:36 +0200
 Subject: [PATCH 25/44] mfd: axp20x-i2c: Fix i2c instantiation

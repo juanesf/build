@@ -1,4 +1,4 @@
-From 9cbb62361e5aeb4773249764210a6e031e831297 Mon Sep 17 00:00:00 2001
+From 1a06ed3a4fc767e4f0094e286b4256823fd5b0d2 Mon Sep 17 00:00:00 2001
 From: Juan Sanchez <juanesf91@gmail.com>
 Date: Sun, 15 Nov 2026 13:27:11 -0300
 Subject: [PATCH 37/44] arm64: dts: allwinner: sun60i-a733: add the GMAC210

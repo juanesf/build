@@ -1,4 +1,4 @@
-From 1d04876aed216812f390d2ca9b12de773ba9c3b5 Mon Sep 17 00:00:00 2001
+From 7fbdf75dcb1c71ec102652b2f51c1c5928c23c8b Mon Sep 17 00:00:00 2001
 From: Andre Przywara <andre.przywara@arm.com>
 Date: Thu, 10 Sep 2026 12:44:37 +0200
 Subject: [PATCH 26/44] dt-bindings: mfd: x-powers,axp152: Document AXP318W

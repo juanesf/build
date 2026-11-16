@@ -1,4 +1,4 @@
-From 0ac517a35df97e75ad26379849631a4c2310c7e9 Mon Sep 17 00:00:00 2001
+From bee3160bfc085b5b742fd7c81ce0a5259f62c35e Mon Sep 17 00:00:00 2001
 From: Junhui Liu <junhui.liu@pigmoral.tech>
 Date: Thu, 12 Nov 2026 15:11:55 +0800
 Subject: [PATCH 06/44] clk: sunxi-ng: a733: Add mod clocks support

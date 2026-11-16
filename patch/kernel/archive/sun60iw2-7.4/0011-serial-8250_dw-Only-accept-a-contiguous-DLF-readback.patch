@@ -1,4 +1,4 @@
-From f05af6e69d61b406bb13a4cdc046627fc1db7f8a Mon Sep 17 00:00:00 2001
+From fda290740de1885b40aaa67186435366dd59c859 Mon Sep 17 00:00:00 2001
 From: Vinicius Pedrosa <vinicius.eduardo.pedrosa@gmail.com>
 Date: Mon, 19 Oct 2026 17:06:11 -0300
 Subject: [PATCH 11/44] serial: 8250_dw: Only accept a contiguous DLF readback
