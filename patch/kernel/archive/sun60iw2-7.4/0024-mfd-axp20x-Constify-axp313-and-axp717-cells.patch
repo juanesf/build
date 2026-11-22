@@ -1,7 +1,7 @@
-From 638cbf189d04e4429e46e76bfe4175aeeb15e6d0 Mon Sep 17 00:00:00 2001
+From b927e287b35d70f2b8b3dafcce5fd58effc7f022 Mon Sep 17 00:00:00 2001
 From: Jerome Brunet <jbrunet@baylibre.com>
 Date: Thu, 10 Sep 2026 12:44:35 +0200
-Subject: [PATCH 24/44] mfd: axp20x: Constify axp313 and axp717 cells
+Subject: [PATCH 24/56] mfd: axp20x: Constify axp313 and axp717 cells
 
 mfd_cells array should generally be const and there does not seem to be
 anything against it for the axp313 and axp717.
@@ -35,6 +35,3 @@ index 50df66de2..4d770e718 100644
  	MFD_CELL_NAME("axp20x-regulator"),
  	MFD_CELL_RES("axp20x-pek", axp717_pek_resources),
  	MFD_CELL_OF("axp717-adc",
--- 
-2.53.0
-

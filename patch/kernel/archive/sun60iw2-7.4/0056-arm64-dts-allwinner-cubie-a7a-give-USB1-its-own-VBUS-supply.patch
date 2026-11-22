@@ -1,0 +1,85 @@
+From a2c32d141267847591c1fe2059bdc7fab3c16eb0 Mon Sep 17 00:00:00 2001
+From: Juan Sanchez <juanesf91@gmail.com>
+Date: Mon, 16 Nov 2026 23:30:44 -0300
+Subject: [PATCH 56/56] arm64: dts: allwinner: cubie-a7a: give USB1 its own VBUS
+ supply
+
+USB0 is the OTG/Type-C port, switched by PL2 (USB0-DRVVBUS). USB2 carries
+the upstream of the FE1.1S hub and is switched by PM5 (USB_HOST_EN ->
+VCC5V0_USB20). The DTS used reg_usb0_vbus (PL2) for usb1_vbus-supply and
+also attached vbus-supply to all four EHCI/OHCI controllers.
+
+Follow the sun55i boards that work (Cubie A5E, Avaota A1): give each PHY
+its own VBUS supply in the usbphy node only, and leave the vbus-supply
+properties off the EHCI/OHCI controllers. This makes the hub's VBUS switch
+a real consumer of the PHY that drives USB2 instead of a duplicate of the
+OTG port's switch.
+
+Also give reg_usb1_vbus a 150 ms enable ramp delay, mirroring the
+reg_cldo4 delay on the Cubie A5E, so VCC5V0_USB20 and the devices on the
+hub's downstream ports settle before the host starts enumerating.
+
+Signed-off-by: Juan Sanchez <juanesf91@gmail.com>
+---
+ .../dts/allwinner/sun60i-a733-cubie-a7a.dts   | 20 ++++++++++++++-----
+ 1 file changed, 15 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts
+index 66da41560..378c25ac5 100644
+--- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts
++++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts
+@@ -81,6 +81,12 @@ reg_usb1_vbus: regulator-usb1-vbus {
+ 		regulator-max-microvolt = <5000000>;
+ 		gpio = <&r_pio 1 5 GPIO_ACTIVE_HIGH>;
+ 		enable-active-high;
++		/*
++		 * The FE1.1S hub and the devices on its downstream ports need
++		 * VCC5V0_USB20 to settle before the host starts enumerating.
++		 * Mirrors the enable ramp delay used on the Cubie A5E PHY rail.
++		 */
++		regulator-enable-ramp-delay = <150000>;
+ 		regulator-always-on;
+ 	};
+ 
+@@ -199,29 +205,33 @@ ext_rgmii_phy: ethernet-phy@1 {
+ 	};
+ };
+ 
++/*
++ * USB0 is the OTG/Type-C port and takes VBUS from PL2 (USB0-DRVVBUS).
++ * USB2 (the FE1.1S hub upstream) and its EHCI/OHCI companion live on the
++ * other PHY, whose VBUS switch is PM5 (USB_HOST_EN -> VCC5V0_USB20).
++ * Give each PHY its own VBUS supply, as the Cubie A5E does. The VBUS is
++ * managed from the PHY node only -- the sun55i boards that work (A5E,
++ * Avaota A1) do not attach vbus-supply to the EHCI/OHCI controllers.
++ */
+ &usbphy {
+ 	usb0_vbus-supply = <&reg_usb0_vbus>;
+-	usb1_vbus-supply = <&reg_usb0_vbus>;
++	usb1_vbus-supply = <&reg_usb1_vbus>;
+ 	status = "okay";
+ };
+ 
+ &ehci0 {
+-	vbus-supply = <&reg_usb0_vbus>;
+ 	status = "okay";
+ };
+ 
+ &ohci0 {
+-	vbus-supply = <&reg_usb0_vbus>;
+ 	status = "okay";
+ };
+ 
+ &ehci1 {
+-	vbus-supply = <&reg_usb0_vbus>;
+ 	status = "okay";
+ };
+ 
+ &ohci1 {
+-	vbus-supply = <&reg_usb0_vbus>;
+ 	status = "okay";
+ };
+ 
+-- 
+2.53.0
+

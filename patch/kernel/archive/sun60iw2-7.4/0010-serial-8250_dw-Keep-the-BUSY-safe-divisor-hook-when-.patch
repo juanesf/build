@@ -1,7 +1,7 @@
-From a84980708704e1c22931660410c2ad64a11547ba Mon Sep 17 00:00:00 2001
+From 0f13379a532d2b6614c6e47f4334cdfebdbcb314 Mon Sep 17 00:00:00 2001
 From: Vinicius Pedrosa <vinicius.eduardo.pedrosa@gmail.com>
 Date: Mon, 19 Oct 2026 17:06:10 -0300
-Subject: [PATCH 10/44] serial: 8250_dw: Keep the BUSY-safe divisor hook when
+Subject: [PATCH 10/56] serial: 8250_dw: Keep the BUSY-safe divisor hook when
  DLF is present
 
 dw8250_probe() installs dw8250_set_divisor(), which brackets the
@@ -102,6 +102,3 @@ index 39fcb1b32..4bb0ccb3e 100644
  
  static inline u32 dw8250_readl_ext(struct uart_port *p, int offset)
  {
--- 
-2.53.0
-

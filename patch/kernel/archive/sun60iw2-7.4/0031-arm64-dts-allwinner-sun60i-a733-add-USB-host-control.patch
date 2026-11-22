@@ -1,7 +1,7 @@
-From 4036cab5dda00d5b14767d1e3734584fbdd4f6b4 Mon Sep 17 00:00:00 2001
+From b07aee7b08566824ab793a4f88ac88cd9b276122 Mon Sep 17 00:00:00 2001
 From: Juan Sanchez <juanesf91@gmail.com>
 Date: Sun, 15 Nov 2026 03:23:09 -0300
-Subject: [PATCH 31/44] arm64: dts: allwinner: sun60i-a733: add USB host
+Subject: [PATCH 31/56] arm64: dts: allwinner: sun60i-a733: add USB host
  controllers
 
 The A733 DTSI imported from the patchwork series describes no USB node at
@@ -36,7 +36,7 @@ diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts b/arch/arm6
 index 977594dc5..cb0aa233d 100644
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts
-@@ -159,6 +159,43 @@ &mmc0 {
+@@ -159,8 +159,45 @@ &mmc0 {
  	status = "okay";
  };
  
@@ -78,7 +78,9 @@ index 977594dc5..cb0aa233d 100644
 +};
 +
  &osc {
- 	clock-frequency = <24000000>;
+ 	/* The board wires a 26 MHz DCXO (schematic: DCXO-SYS 26MHz). PLL_REF
+ 	 * normalizes it to the 24 MHz reference used by the rest of the SoC. */
+ 	clock-frequency = <26000000>;
  };
 diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733.dtsi b/arch/arm64/boot/dts/allwinner/sun60i-a733.dtsi
 index d0b9f432e..8b9a41b6a 100644
@@ -182,6 +184,3 @@ index d0b9f432e..8b9a41b6a 100644
  		r_ccu: clock-controller@7010000 {
  			compatible = "allwinner,sun60i-a733-r-ccu";
  			reg = <0x07010000 0x250>;
--- 
-2.53.0
-

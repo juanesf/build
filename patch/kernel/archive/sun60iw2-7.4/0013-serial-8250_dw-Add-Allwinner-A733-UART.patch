@@ -1,7 +1,7 @@
-From 70e71a290914af9facbf64aa6249b9ba06fa8b60 Mon Sep 17 00:00:00 2001
+From c133c5ff9e5f33d1577c2cf1542c66d00ff05fa1 Mon Sep 17 00:00:00 2001
 From: Vinicius Pedrosa <vinicius.eduardo.pedrosa@gmail.com>
 Date: Mon, 19 Oct 2026 17:06:13 -0300
-Subject: [PATCH 13/44] serial: 8250_dw: Add Allwinner A733 UART
+Subject: [PATCH 13/56] serial: 8250_dw: Add Allwinner A733 UART
 
 On the A733, dw8250_set_termios() stops the UART clock around
 clk_set_rate() on every termios change that reaches the driver. If TX is
@@ -30,6 +30,3 @@ index c78299d6b..8fb2efef7 100644
  	{ .compatible = "cavium,octeon-3860-uart", .data = &dw8250_octeon_3860_data },
  	{ .compatible = "marvell,armada-38x-uart", .data = &dw8250_armada_38x_data },
  	{ .compatible = "renesas,rzn1-uart", .data = &dw8250_renesas_rzn1_data },
--- 
-2.53.0
-

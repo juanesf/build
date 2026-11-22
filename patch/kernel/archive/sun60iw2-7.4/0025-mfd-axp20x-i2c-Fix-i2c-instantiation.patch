@@ -1,7 +1,7 @@
-From a03be903d9380c83ad5d945b11e62d5c1f7a12f8 Mon Sep 17 00:00:00 2001
+From 3e6bfedb42f36b31b7cefaeb287c5d32d95b1a68 Mon Sep 17 00:00:00 2001
 From: Jerome Brunet <jbrunet@baylibre.com>
 Date: Thu, 10 Sep 2026 12:44:36 +0200
-Subject: [PATCH 25/44] mfd: axp20x-i2c: Fix i2c instantiation
+Subject: [PATCH 25/56] mfd: axp20x-i2c: Fix i2c instantiation
 
 Apparently this device never really supported i2c instantiation via
 sysfs, because the driver does not even look at the i2c device data,
@@ -102,6 +102,3 @@ index b352661d9..1badb4868 100644
   *
   * This lets the axp20x core configure the mfd cells and register maps
   * for later use.
--- 
-2.53.0
-

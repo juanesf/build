@@ -1,0 +1,86 @@
+From c41b3a1c54b2a1b03c7e842ff1496c640b10f249 Mon Sep 17 00:00:00 2001
+From: Juan Sanchez <juanesf91@gmail.com>
+Date: Sun, 15 Nov 2026 23:04:49 -0300
+Subject: [PATCH 49/56] arm64: dts: allwinner: sun60i-a733: describe the system
+ control, SERDES CCU and PCK-600
+
+The USB 2.0 PHY of the DWC3 controller takes its 200 ohm reference
+resistor calibration from the system control block, its reset from the
+clock and reset unit at the start of the SERDES block, and both it and
+the controller live in the USB2 power domain of the PCK-600.
+
+Describe the three blocks so that the PHY, the bus gates of the
+controller and the power domain can be referenced. The system control
+node gives the SRAM driver a regmap through which it hands out the two
+calibration registers, and the PCK-600 window ends before the PRCM I2C
+controllers.
+
+Signed-off-by: Juan Sanchez <juanesf91@gmail.com>
+---
+ .../arm64/boot/dts/allwinner/sun60i-a733.dtsi | 29 +++++++++++++++++++
+ 1 file changed, 29 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733.dtsi b/arch/arm64/boot/dts/allwinner/sun60i-a733.dtsi
+index 452624c68..cc8709e67 100644
+--- a/arch/arm64/boot/dts/allwinner/sun60i-a733.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun60i-a733.dtsi
+@@ -3,9 +3,12 @@
+ #include <dt-bindings/clock/sun6i-rtc.h>
+ #include <dt-bindings/clock/allwinner,sun60i-a733-ccu.h>
+ #include <dt-bindings/clock/allwinner,sun60i-a733-r-ccu.h>
++#include <dt-bindings/clock/allwinner,sun60i-a733-serdes-ccu.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/power/allwinner,sun60i-a733-pck-600.h>
+ #include <dt-bindings/reset/allwinner,sun60i-a733-ccu.h>
+ #include <dt-bindings/reset/allwinner,sun60i-a733-r-ccu.h>
++#include <dt-bindings/reset/allwinner,sun60i-a733-serdes-ccu.h>
+ 
+ / {
+ 	#address-cells = <2>;
+@@ -425,6 +428,14 @@ i2c12: i2c@251c000 {
+ 			status = "disabled";
+ 		};
+ 
++		syscon: syscon@3000000 {
++			compatible = "allwinner,sun60i-a733-system-control";
++			reg = <0x03000000 0x1000>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++		};
++
+ 		gic: interrupt-controller@3400000 {
+ 			compatible = "arm,gic-v3";
+ 			reg = <0x03400000 0x10000>, <0x03460000 0x100000>;
+@@ -612,6 +623,17 @@ dwc3: usb@6a00000 {
+ 			status = "disabled";
+ 		};
+ 
++		serdes_ccu: clock-controller@6c00000 {
++			compatible = "allwinner,sun60i-a733-serdes-ccu";
++			reg = <0x06c00000 0x10>;
++			clocks = <&ccu CLK_AHB_SERDES>, <&ccu CLK_MBUS_SERDES>,
++				 <&ccu CLK_USB2_U2_PIPE>;
++			clock-names = "ahb", "mbus", "usb2-u2-pipe";
++			resets = <&ccu RST_BUS_SERDES>;
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++		};
++
+ 		r_ccu: clock-controller@7010000 {
+ 			compatible = "allwinner,sun60i-a733-r-ccu";
+ 			reg = <0x07010000 0x250>;
+@@ -654,6 +676,13 @@ r_i2c0_pl_pins: r-i2c0-pl-pins {
+ 			};
+ 		};
+ 
++		pck600: power-controller@7060000 {
++			compatible = "allwinner,sun60i-a733-pck-600";
++			reg = <0x07060000 0x19000>;
++			clocks = <&r_ccu CLK_BUS_R_PPU>;
++			#power-domain-cells = <1>;
++		};
++
+ 		r_uart0: serial@7080000 {
+ 			compatible = "allwinner,sun60i-a733-uart",
+ 				     "snps,dw-apb-uart";

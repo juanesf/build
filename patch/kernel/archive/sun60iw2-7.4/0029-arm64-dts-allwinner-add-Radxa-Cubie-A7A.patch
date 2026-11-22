@@ -1,7 +1,7 @@
-From a0f29e86bac588f8156c5508f43e068ca882f2db Mon Sep 17 00:00:00 2001
+From c933d7a3f6019acb0e3fa19961edade5584f7638 Mon Sep 17 00:00:00 2001
 From: Juan Sanchez <juanesf91@gmail.com>
 Date: Sat, 14 Nov 2026 21:48:39 -0300
-Subject: [PATCH 29/44] arm64: dts: allwinner: add Radxa Cubie A7A
+Subject: [PATCH 29/56] arm64: dts: allwinner: add Radxa Cubie A7A
 
 Add a board device tree for the Radxa Cubie A7A (Allwinner A733 / sun60iw2),
 based on the mainline A733 SoC description and the Cubie A7Z board DTS.
@@ -60,7 +60,7 @@ new file mode 100644
 index 000000000..977594dc5
 --- /dev/null
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts
-@@ -0,0 +1,369 @@
+@@ -0,0 +1,370 @@
 +// SPDX-License-Identifier: (GPL-2.0-only OR MIT)
 +/dts-v1/;
 +
@@ -223,7 +223,9 @@ index 000000000..977594dc5
 +};
 +
 +&osc {
-+	clock-frequency = <24000000>;
++	/* The board wires a 26 MHz DCXO (schematic: DCXO-SYS 26MHz). PLL_REF
++	 * normalizes it to the 24 MHz reference used by the rest of the SoC. */
++	clock-frequency = <26000000>;
 +};
 +
 +&pio {
@@ -428,8 +430,4 @@ index 000000000..977594dc5
 +	max-frequency = <200000000>;
 +	non-removable;
 +	disable-wp;
-+	status = "okay";
 +};
--- 
-2.53.0
-

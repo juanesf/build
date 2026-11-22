@@ -1,7 +1,7 @@
-From f228a4ee410aa94a9ae458a0c483497518a2027d Mon Sep 17 00:00:00 2001
+From c3546ae519638d390c8dfa658a99c07d33c4ea50 Mon Sep 17 00:00:00 2001
 From: Enzo Adriano <enzo.adriano.code@gmail.com>
 Date: Mon, 9 Nov 2026 23:45:18 -0500
-Subject: [PATCH 16/44] dt-bindings: arm: sunxi: document Radxa Cubie A7S
+Subject: [PATCH 16/56] dt-bindings: arm: sunxi: document Radxa Cubie A7S
 
 Document the Radxa Cubie A7S board and Allwinner A733 SoC compatibles
 for the accompanying initial board device tree, so it can be identified
@@ -29,6 +29,3 @@ index 28437c47a..37a7d713a 100644
        - description: Remix Mini PC
          items:
            - const: jide,remix-mini-pc
--- 
-2.53.0
-

@@ -1,7 +1,7 @@
-From a8471567309cbaab0637d4c5bc6e078f488b509b Mon Sep 17 00:00:00 2001
+From c10a68039523bae931a0acf1513989ac7f9a0429 Mon Sep 17 00:00:00 2001
 From: Junhui Liu <junhui.liu@pigmoral.tech>
 Date: Thu, 12 Nov 2026 15:11:54 +0800
-Subject: [PATCH 05/44] clk: sunxi-ng: a733: Add bus clocks support
+Subject: [PATCH 05/56] clk: sunxi-ng: a733: Add bus clocks support
 
 Add the essential bus clocks in the Allwinner A733 CCU, including AHB,
 APB0, APB1, APB_UART, and MBUS. These buses are necessary for many other
@@ -185,6 +185,3 @@ index 2bc048db8..8bc603393 100644
  	},
  	.num	= CLK_FANOUT3 + 1,
  };
--- 
-2.53.0
-

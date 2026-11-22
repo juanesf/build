@@ -1,0 +1,124 @@
+From a6bd31bc7e311af59bfabca001ccd9c61d736096 Mon Sep 17 00:00:00 2001
+From: Juan Sanchez <juanesf91@gmail.com>
+Date: Sun, 15 Nov 2026 23:05:38 -0300
+Subject: [PATCH 50/56] arm64: dts: allwinner: sun60i-a733: describe the USB2
+ PHY and wire DWC3
+
+Add the USB 2.0 PHY of the DWC3 controller and wire the controller to
+it, to the USB2 power domain and to the clock and reset unit of the
+SERDES block.
+
+The DWC3 core soft reset runs on the UTMI clock of this PHY, so the PHY
+has to be up before the controller leaves reset; it takes its reset from
+the SERDES unit and its 200 ohm reference calibration from the system
+control block. The controller additionally needs its master bus clock
+and the two SERDES bus gates, which are otherwise switched off once the
+clock core disables the unused ones.
+
+Keep high-speed mode: on this board only the USB 2.0 PHY is wired, to
+the USB hub and to the AIC8800 module behind it.
+
+The USB2 suspend and reference clock muxes power up selecting the raw
+DCXO. Several A733 boards (including the Cubie A7A) wire a 26 MHz DCXO
+that PLL_REF normalizes to the 24 MHz sys-24M reference, while the USB2
+PHY's FSEL strapping assumes a 24 MHz input. Pin both muxes to sys-24M
+so the PHY PLL and the DWC3 soft reset see the expected 24 MHz instead
+of the DCXO frequency.
+
+Signed-off-by: Juan Sanchez <juanesf91@gmail.com>
+---
+ .../dts/allwinner/sun60i-a733-cubie-a7a.dts   | 12 ++++---
+ .../arm64/boot/dts/allwinner/sun60i-a733.dtsi | 44 +++++++++++++++++++----
+ 2 files changed, 45 insertions(+), 13 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts
+index ffcc030b5..7270f36ad 100644
+--- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts
++++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts
+@@ -218,11 +218,15 @@ &ohci1 {
+ };
+ 
+ /*
+- * On the Cubie A7A the DWC3 is wired to the USB 2.0 femtoPHY only; the
+- * USB 3.0 combo PHY is not used. Sheet 14 of the v1.10 schematic shows
+- * the USB 3.0/2.0 hub (and, through its port 4, the AIC8800 WiFi module)
+- * downstream of this path.
++ * On the Cubie A7A the DWC3 is wired to its USB 2.0 PHY only; the USB 3.0
++ * combo PHY of the SERDES block is not used. Sheet 14 of the v1.10
++ * schematic shows the USB 3.0/2.0 hub (and, through its port 4, the
++ * AIC8800 WiFi module) downstream of this path.
+  */
++&u2phy {
++	status = "okay";
++};
++
+ &dwc3 {
+ 	dr_mode = "host";
+ 	status = "okay";
+diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733.dtsi b/arch/arm64/boot/dts/allwinner/sun60i-a733.dtsi
+index cc8709e67..62a509246 100644
+--- a/arch/arm64/boot/dts/allwinner/sun60i-a733.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun60i-a733.dtsi
+@@ -605,24 +605,53 @@ ohci1: usb@4200400 {
+ 		};
+ 
+ 		dwc3: usb@6a00000 {
+-			compatible = "snps,dwc3";
++			compatible = "allwinner,sun60i-a733-dwc3";
+ 			reg = <0x06a00000 0x10000>;
+ 			interrupts = <GIC_SPI 155 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&ccu CLK_BUS_OTG>,
+-				 <&ccu CLK_USB2_U2_REF>,
+-				 <&ccu CLK_USB2_SUSPEND>;
+-			clock-names = "bus_early", "ref", "suspend";
++			clocks = <&ccu CLK_USB2_U2_REF>,
++				 <&ccu CLK_USB2_MF>,
++				 <&ccu CLK_USB2_SUSPEND>,
++				 <&serdes_ccu CLK_BUS_USB3_ACLK>,
++				 <&serdes_ccu CLK_BUS_USB3_HCLK>;
++			clock-names = "ref", "mf", "suspend", "axi", "ahb";
+-			assigned-clocks = <&ccu CLK_USB2_SUSPEND>;
+-			assigned-clock-rates = <24000000>;
++			/*
++			 * U2P0_PHYCTL.FSEL is hardwired to 24MHz on this SoC
++			 * (the only options are 19.2/20/24MHz), and the PHY's
++			 * PLL derives both the 480MHz and the 60MHz UTMI clock
++			 * from it. The mux defaults to the raw DCXO, which is
++			 * 26MHz on several boards, so pin it to the normalized
++			 * 24MHz reference instead of relying on the reset value.
++			 */
++			assigned-clocks = <&ccu CLK_USB2_SUSPEND>,
++					  <&ccu CLK_USB2_U2_REF>;
++			assigned-clock-parents = <&ccu CLK_SYS_24M>,
++						 <&ccu CLK_SYS_24M>;
++			assigned-clock-rates = <24000000>, <24000000>;
+-			resets = <&ccu RST_BUS_OTG>, <&ccu RST_BUS_USB2>;
+-			reset-names = "bus", "dwc3";
++			resets = <&ccu RST_BUS_USB2>;
++			power-domains = <&pck600 PD_USB2>;
++			phys = <&u2phy>;
++			phy-names = "usb2-phy";
+ 			maximum-speed = "high-speed";
+ 			dr_mode = "host";
++			phy_type = "utmi";
++			snps,dis_enblslpm_quirk;
++			snps,dis-u1-entry-quirk;
++			snps,dis-u2-entry-quirk;
+ 			snps,dis_u2_susphy_quirk;
+ 			snps,dis_u3_susphy_quirk;
+ 			status = "disabled";
+ 		};
+ 
++		u2phy: phy@6b00000 {
++			compatible = "allwinner,sun60i-a733-usb2-phy";
++			reg = <0x06b00000 0x800>;
++			allwinner,sram = <&syscon>;
++			clocks = <&ccu CLK_RES_DCAP_24M>;
++			resets = <&serdes_ccu RST_USB3_USB2_PHY>;
++			#phy-cells = <0>;
++			status = "disabled";
++		};
++
+ 		serdes_ccu: clock-controller@6c00000 {
+ 			compatible = "allwinner,sun60i-a733-serdes-ccu";
+ 			reg = <0x06c00000 0x10>;

@@ -1,7 +1,7 @@
-From bee3160bfc085b5b742fd7c81ce0a5259f62c35e Mon Sep 17 00:00:00 2001
+From 13994ca6d22fe10fe6d139696d366b1a92cfd555 Mon Sep 17 00:00:00 2001
 From: Junhui Liu <junhui.liu@pigmoral.tech>
 Date: Thu, 12 Nov 2026 15:11:55 +0800
-Subject: [PATCH 06/44] clk: sunxi-ng: a733: Add mod clocks support
+Subject: [PATCH 06/56] clk: sunxi-ng: a733: Add mod clocks support
 
 Add the module clocks found in the Allwinner A733 SoC, including video,
 storage, interfaces and others. While most of these clocks are similar
@@ -1150,6 +1150,3 @@ index 8bc603393..5ea65bf5b 100644
  	},
  	.num	= CLK_FANOUT3 + 1,
  };
--- 
-2.53.0
-

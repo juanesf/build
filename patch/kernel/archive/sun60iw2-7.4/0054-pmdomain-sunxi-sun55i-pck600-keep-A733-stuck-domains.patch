@@ -1,0 +1,56 @@
+From f3678e4c82714f97b859a43886a4d44f360f78b9 Mon Sep 17 00:00:00 2001
+From: Juan Sanchez <juanesf91@gmail.com>
+Date: Mon, 16 Nov 2026 08:19:31 -0300
+Subject: [PATCH 54/56] pmdomain: sunxi: sun55i-pck600: keep A733 stuck domains
+ always on
+
+On the A733 the PPU does not complete an off transition for the display
+domains (VO, VO1, DE_SYS), nor for USB2. genpd tries to power down the
+display domains at sync_state() because they have no consumer, and USB2
+whenever its consumer fails to probe; every attempt times out in
+sunxi_pck600_pd_set_power() and delays the boot by several seconds:
+
+  sunxi-pck-600 7060000.power-controller: failed to turn domain "VO1" off: -110
+  sunxi-pck-600 7060000.power-controller: failed to turn domain "VO" off: -110
+  sunxi-pck-600 7060000.power-controller: failed to turn domain "DE_SYS" off: -110
+  sunxi-pck-600 7060000.power-controller: failed to turn domain "USB2" off: -110
+
+The boot firmware already leaves these domains on, so flag them
+GENPD_FLAG_ALWAYS_ON. This removes the repeated timeouts from the boot
+and keeps the USB2 domain usable if the DWC3 host fails to probe.
+
+Signed-off-by: Juan Sanchez <juanesf91@gmail.com>
+---
+ drivers/pmdomain/sunxi/sun55i-pck600.c | 14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/pmdomain/sunxi/sun55i-pck600.c b/drivers/pmdomain/sunxi/sun55i-pck600.c
+index 37bb82b17..68f3d20b3 100644
+--- a/drivers/pmdomain/sunxi/sun55i-pck600.c
++++ b/drivers/pmdomain/sunxi/sun55i-pck600.c
+@@ -239,10 +239,20 @@ static const struct sunxi_pck600_desc sun55i_a523_pck600_desc = {
+ 	.has_rst_clk = true,
+ };
+ 
++/*
++ * On the A733 the PPU does not complete an off transition for the display
++ * pipeline domains (VO, VO1, DE_SYS) or for USB2. genpd tries to power
++ * down the display domains at sync_state() because they have no consumer,
++ * and USB2 whenever its consumer fails to probe; every attempt times out
++ * in sunxi_pck600_pd_set_power() and stalls the boot by several seconds
++ * per domain. Keep them on, as the boot firmware already left them on.
++ */
+ static const struct sunxi_pck600_pd_desc sun60i_a733_pck600_pds[] = {
+-	{ "VI", }, { "DE_SYS", }, { "VE_DEC", }, { "VE_ENC", }, { "NPU", },
++	{ "VI", }, { "DE_SYS", GENPD_FLAG_ALWAYS_ON },
++	{ "VE_DEC", }, { "VE_ENC", }, { "NPU", },
+ 	{ "GPU_TOP", }, { "GPU_CORE", GENPD_FLAG_ALWAYS_ON },
+-	{ "PCIE", }, { "USB2", }, { "VO", }, { "VO1", },
++	{ "PCIE", }, { "USB2", GENPD_FLAG_ALWAYS_ON },
++	{ "VO", GENPD_FLAG_ALWAYS_ON }, { "VO1", GENPD_FLAG_ALWAYS_ON },
+ };
+ 
+ static const struct sunxi_pck600_desc sun60i_a733_pck600_desc = {
+-- 
+2.53.0
+

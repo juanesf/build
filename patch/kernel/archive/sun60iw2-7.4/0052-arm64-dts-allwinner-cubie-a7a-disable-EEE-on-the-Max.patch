@@ -1,7 +1,7 @@
-From 51686f5a94cab33c5c2b4b1438e65c0ec9de7fdb Mon Sep 17 00:00:00 2001
+From 9f624529e42d18be0f7457c7de9914230fb4581d Mon Sep 17 00:00:00 2001
 From: Juan Sanchez <juanesf91@gmail.com>
 Date: Sun, 15 Nov 2026 15:56:31 -0300
-Subject: [PATCH 43/44] arm64: dts: allwinner: cubie-a7a: disable EEE on the
+Subject: [PATCH 52/56] arm64: dts: allwinner: cubie-a7a: disable EEE on the
  Maxio PHY
 
 The Cubie A7A uses a Maxio MAE0621A-Q3C PHY (ID 0x7b744412), for which
@@ -25,7 +25,7 @@ Signed-off-by: Juan Sanchez <juanesf91@gmail.com>
  1 file changed, 8 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts
-index e90821807..5cf69466c 100644
+index 7270f36ad..9e8183991 100644
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts
 @@ -187,6 +187,14 @@ ext_rgmii_phy: ethernet-phy@1 {
@@ -43,6 +43,3 @@ index e90821807..5cf69466c 100644
  		};
  	};
  };
--- 
-2.53.0
-

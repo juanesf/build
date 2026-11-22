@@ -1,7 +1,7 @@
-From e88e8243dd3f253e6d5e236f2d119493999aeec5 Mon Sep 17 00:00:00 2001
+From 3f35484558db7283da1b5db0b319b5eb20d70b5a Mon Sep 17 00:00:00 2001
 From: Enzo Adriano <enzo.adriano.code@gmail.com>
 Date: Fri, 30 Oct 2026 22:26:47 -0400
-Subject: [PATCH 14/44] dt-bindings: mmc: describe the Allwinner A733 eMMC
+Subject: [PATCH 14/56] dt-bindings: mmc: describe the Allwinner A733 eMMC
  controller
 
 SMHC3 uses a different DMA descriptor format from SMHC0/2: the length
@@ -107,6 +107,3 @@ index 000000000..07dc6759b
 +        resets = <&ccu RST_BUS_MMC3>;
 +        reset-names = "ahb";
 +    };
--- 
-2.53.0
-

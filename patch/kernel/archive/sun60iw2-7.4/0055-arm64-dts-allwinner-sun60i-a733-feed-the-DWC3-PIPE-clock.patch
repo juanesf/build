@@ -1,0 +1,77 @@
+From 6511203bf10dbe7ac21842bcb4dde0459066ced4 Mon Sep 17 00:00:00 2001
+From: Juan Sanchez <juanesf91@gmail.com>
+Date: Mon, 16 Nov 2026 17:05:46 -0300
+Subject: [PATCH 55/56] arm64: dts: allwinner: sun60i-a733: feed the DWC3 PIPE clock
+
+clk_summary on the Cubie A7A shows usb3-pipe-ccu (the SERDES CCU gate on
+SUBSYS_USB3P1_BGR bit 20) as a deviceless clock that nobody enables, while
+the sibling AXI and AHB bus clocks are consumed by the DWC3 and stay on:
+
+    usb2-u2-pipe    0  0  0  480000000  Y  deviceless
+       usb3-pipe-ccu 0  0  0  480000000  N  deviceless
+       bus-usb3-aclk 1  1  0  600000000  Y  usb@6a00000
+       bus-usb3-hclk 1  1  0  200000000  Y  usb@6a00000
+
+The core needs that PIPE clock even when only the USB 2.0 port is used, so
+list CLK_USB3_PIPE_CCU in the DWC3 clocks and let the clock framework keep
+it enabled. The glue driver uses devm_clk_bulk_get_all_enabled(), so no
+driver change is needed; only the binding gains a sixth clock name.
+
+Signed-off-by: Juan Sanchez <juanesf91@gmail.com>
+---
+ .../bindings/usb/allwinner,sun60i-a733-dwc3.yaml           | 7 +++++--
+ arch/arm64/boot/dts/allwinner/sun60i-a733.dtsi             | 6 ++++--
+ 2 files changed, 9 insertions(+), 4 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/usb/allwinner,sun60i-a733-dwc3.yaml b/Documentation/devicetree/bindings/usb/allwinner,sun60i-a733-dwc3.yaml
+index 761e45dfa..161fc9220 100644
+--- a/Documentation/devicetree/bindings/usb/allwinner,sun60i-a733-dwc3.yaml
++++ b/Documentation/devicetree/bindings/usb/allwinner,sun60i-a733-dwc3.yaml
+@@ -34,6 +34,7 @@ properties:
+       - description: suspend clock
+       - description: AXI bus clock
+       - description: AHB bus clock
++      - description: USB3 PIPE clock from the SERDES CCU
+ 
+   clock-names:
+     items:
+@@ -42,6 +43,7 @@ properties:
+       - const: suspend
+       - const: axi
+       - const: ahb
++      - const: pipe
+ 
+   resets:
+     maxItems: 1
+@@ -88,8 +90,9 @@ examples:
+                  <&ccu CLK_USB2_MF>,
+                  <&ccu CLK_USB2_SUSPEND>,
+                  <&serdes_ccu CLK_BUS_USB3_ACLK>,
+-                 <&serdes_ccu CLK_BUS_USB3_HCLK>;
+-        clock-names = "ref", "mf", "suspend", "axi", "ahb";
++                 <&serdes_ccu CLK_BUS_USB3_HCLK>,
++                 <&serdes_ccu CLK_USB3_PIPE_CCU>;
++        clock-names = "ref", "mf", "suspend", "axi", "ahb", "pipe";
+         resets = <&ccu RST_BUS_USB2>;
+         power-domains = <&pck600 PD_USB2>;
+         phys = <&usb3_u2phy>, <&combophy0>;
+diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733.dtsi b/arch/arm64/boot/dts/allwinner/sun60i-a733.dtsi
+index c1c1f086d..9dd79a0ff 100644
+--- a/arch/arm64/boot/dts/allwinner/sun60i-a733.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun60i-a733.dtsi
+@@ -612,8 +612,10 @@ dwc3: usb@6a00000 {
+ 				 <&ccu CLK_USB2_MF>,
+ 				 <&ccu CLK_USB2_SUSPEND>,
+ 				 <&serdes_ccu CLK_BUS_USB3_ACLK>,
+-				 <&serdes_ccu CLK_BUS_USB3_HCLK>;
+-			clock-names = "ref", "mf", "suspend", "axi", "ahb";
++				 <&serdes_ccu CLK_BUS_USB3_HCLK>,
++				 <&serdes_ccu CLK_USB3_PIPE_CCU>;
++			clock-names = "ref", "mf", "suspend", "axi", "ahb",
++				      "pipe";
+ 			/*
+ 			 * U2P0_PHYCTL.FSEL is hardwired to 24MHz on this SoC
+ 			 * (the only options are 19.2/20/24MHz), and the PHY's
+-- 
+2.53.0
+

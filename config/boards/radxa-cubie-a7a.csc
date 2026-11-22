@@ -2,10 +2,10 @@
 #
 # TODO: DWC3 USB2 hub / AIC8800 enumeration is still being validated.
 # Ethernet, SD boot, UART and the eMMC module are working.
-BOARD_NAME="Radxa Cubie A7A"
+BOARD_NAME="Cubie A7A"
 BOARD_VENDOR="radxa"
 BOARDFAMILY="sun60iw2"
-BOARD_MAINTAINER="juanesf91"
+BOARD_MAINTAINER="juanesf"
 INTRODUCED="2026"
 KERNEL_TARGET="edge"
 KERNEL_TEST_TARGET="edge"

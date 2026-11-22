@@ -1,7 +1,7 @@
-From 0d46dcd549215dfdfa0f1f2c25708283bd4dad0d Mon Sep 17 00:00:00 2001
+From 7aec9e5559f967d583d1398cf3f7139dacecf7b6 Mon Sep 17 00:00:00 2001
 From: Junhui Liu <junhui.liu@pigmoral.tech>
 Date: Thu, 12 Nov 2026 15:11:51 +0800
-Subject: [PATCH 02/44] clk: sunxi-ng: sdm: Add dual patterns support
+Subject: [PATCH 02/56] clk: sunxi-ng: sdm: Add dual patterns support
 
 On newer Allwinner platforms like the A733, the Sigma-Delta Modulation
 (SDM) control logic is more complex. The SDM enable bit, which was
@@ -157,6 +157,3 @@ index c1a7159b8..e94cef141 100644
  bool ccu_sdm_helper_is_enabled(struct ccu_common *common,
  			       struct ccu_sdm_internal *sdm);
  void ccu_sdm_helper_enable(struct ccu_common *common,
--- 
-2.53.0
-

@@ -1,7 +1,7 @@
-From d3c0e593bb96ca9c6b1a79f3c658fe7bd9b5ea5f Mon Sep 17 00:00:00 2001
+From c487b089a19938dfbcdabf156064ed57314d4497 Mon Sep 17 00:00:00 2001
 From: Junhui Liu <junhui.liu@pigmoral.tech>
 Date: Thu, 12 Nov 2026 15:11:53 +0800
-Subject: [PATCH 04/44] clk: sunxi-ng: a733: Add PLL clocks support
+Subject: [PATCH 04/56] clk: sunxi-ng: a733: Add PLL clocks support
 
 Add PLL clock support for the main CCU of the Allwinner A733 SoC. The
 structure is mostly similar to the sun55i, with the addition of a
@@ -116,19 +116,19 @@ index 000000000..2bc048db8
 +/*
 + * Undocumented, taken from the vendor kernel.
 + * PLL_REF normalizes the DCXO frequency to a 24MHz reference for downstream
-+ * PLLs.
++ * PLLs. On the boards seen so far the 26MHz DCXO is scaled by N=96/M=104,
++ * so the rate depends on the oscillator frequency declared in the board DT.
 + */
 +#define SUN60I_A733_PLL_REF_REG		0x000
-+static struct ccu_nkmp pll_ref_clk = {
-+	.enable		= BIT(27),
++static struct ccu_nm pll_ref_clk = {
++	.enable		= BIT(31),
 +	.lock		= BIT(28),
 +	.n		= _SUNXI_CCU_MULT(8, 8),
 +	.m		= _SUNXI_CCU_DIV(16, 7), /* output divider */
-+	.p		= _SUNXI_CCU_DIV(1, 1), /* input divider */
 +	.common		= {
 +		.reg		= SUN60I_A733_PLL_REF_REG,
 +		.hw.init	= CLK_HW_INIT_PARENTS_DATA("pll-ref", hosc,
-+							   &ccu_nkmp_ops,
++							   &ccu_nm_ops,
 +							   CLK_SET_RATE_GATE),
 +	},
 +};
@@ -659,6 +659,3 @@ index 000000000..2bc048db8
 +MODULE_IMPORT_NS("SUNXI_CCU");
 +MODULE_DESCRIPTION("Support for the Allwinner A733 CCU");
 +MODULE_LICENSE("GPL");
--- 
-2.53.0
-
