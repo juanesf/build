@@ -1,0 +1,116 @@
+From: Juan Sanchez <juanesf91@gmail.com>
+Subject: [PATCH] arm64: dts: allwinner: sun60i-a733: describe the U2P0 PHY and wire DWC3
+
+The DWC3/USB3 DRD controller of the A733 has its own USB 2.0 UTMI PHY
+(U2P0 at 0x06b00000), separate from the sun4i-usb-phy that serves the
+EHCI/OHCI controllers. Jernej's tree wrongly mapped 0x06b00000 as a
+third "pmu2" of sun4i-usb-phy and pointed dwc3 at <&usbphy 2>; that PHY
+has no ISCR/PHYCTL/PHYTUNE and cannot provide the UTMI clock the DWC3
+soft reset runs on, which is why the on-board FE1.1S hub (1a40:0101)
+and the AIC8800 (a69c:8d81) behind it enumerate with -EPROTO or not
+at all.
+
+Describe the real PHY and wire the controller to it:
+
+  * Add u2phy: phy@6b00000 (allwinner,sun60i-a733-usb2-phy) with its
+    syscon calibration phandle, the SERDES phandle for the UTMI mux,
+    CLK_RES_DCAP_24M and RST_SERDES_USB3_USB2_PHY.
+  * Reduce usbphy to its two EHCI/OHCI PHYs (drop the pmu2 mapping,
+    third clock and third reset).
+  * Point dwc3.phys at <&u2phy> and add the snps,dis-* quirks the BSP
+    uses. Keep dr_mode=host and maximum-speed=high-speed (no combo
+    PHY on this board).
+  * Enable &u2phy in the Cubie A7A board DTS.
+
+Signed-off-by: Juan Sanchez <juanesf91@gmail.com>
+---
+ arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts |  4 ++++
+ arch/arm64/boot/dts/allwinner/sun60i-a733.dtsi          | 40 ++++++++++++++----
+ 2 files changed, 40 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733.dtsi b/arch/arm64/boot/dts/allwinner/sun60i-a733.dtsi
+--- a/arch/arm64/boot/dts/allwinner/sun60i-a733.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun60i-a733.dtsi
+@@ -760,24 +760,18 @@
+ 				     "allwinner,sun20i-d1-usb-phy";
+ 			reg = <0x04100400 0x100>,
+ 			      <0x04101800 0x100>,
+-			      <0x04200800 0x100>,
+-			      <0x06b00000 0x100>;
++			      <0x04200800 0x100>;
+ 			reg-names = "phy_ctrl",
+ 				    "pmu0",
+-				    "pmu1",
+-				    "pmu2";
++				    "pmu1";
+ 			clocks = <&ccu CLK_USB01_REF>,
+-				 <&ccu CLK_USB01_REF>,
+-				 <&ccu CLK_USB2_U2_REF>;
++				 <&ccu CLK_USB01_REF>;
+ 			clock-names = "usb0_phy",
+-				      "usb1_phy",
+-				      "usb2_phy";
++				      "usb1_phy";
+ 			resets = <&ccu RST_USB_PHY0>,
+-				 <&ccu RST_USB_PHY1>,
+-				 <&serdes_ccu RST_SERDES_USB3_USB2_PHY>;
++				 <&ccu RST_USB_PHY1>;
+ 			reset-names = "usb0_reset",
+-				      "usb1_reset",
+-				      "usb2_reset";
++				      "usb1_reset";
+ 			power-domains = <&pck600 PD_USB2>;
+ 			status = "disabled";
+ 			#phy-cells = <1>;
+@@ -920,13 +914,16 @@
+ 				compatible = "snps,dwc3";
+ 				reg = <0x06a00000 0x100000>;
+ 				interrupts = <GIC_SPI 155 IRQ_TYPE_LEVEL_HIGH>;
+-				phys = <&usbphy 2>;
++				phys = <&u2phy>;
+ 				phy-names = "usb2-phy";
+ 				phy_type = "utmi";
+ 				dr_mode = "host";
+ 				maximum-speed = "high-speed";
+ 				snps,dis_u2_susphy_quirk;
+ 				snps,dis_enblslpm_quirk;
++				snps,dis-u1-entry-quirk;
++				snps,dis-u2-entry-quirk;
++				snps,dis_u3_susphy_quirk;
+ 			};
+ 		};
+ 
+@@ -977,6 +974,18 @@
+ 			};
+ 		};
+ 
++		/* USB 2.0 UTMI PHY (U2P0) of the DWC3/USB3 DRD controller.
++		 * Separate from usbphy: its registers are MMIO-direct here, and
++		 * the DWC3 soft reset runs on this PHY's UTMI clock. */
++		u2phy: phy@6b00000 {
++			compatible = "allwinner,sun60i-a733-usb2-phy";
++			reg = <0x06b00000 0x800>;
++			allwinner,sram = <&syscon>;
++			clocks = <&ccu CLK_RES_DCAP_24M>;
++			#phy-cells = <0>;
++			status = "disabled";
++		};
++
+ 		serdes_ccu: clock-controller@6c00000 {
+ 			compatible = "allwinner,sun60i-a733-serdes-ccu", "syscon";
+ 			reg = <0x06c00000 0x400>;
+diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts
+--- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts
++++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts
+@@ -634,6 +634,11 @@
+ 	status = "okay";
+ };
+ 
++/* U2P0 is the USB2 side of the DWC3 (FE1.1S hub + AIC8800 path). */
++&u2phy {
++	status = "okay";
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pb9_pb10_pins>;

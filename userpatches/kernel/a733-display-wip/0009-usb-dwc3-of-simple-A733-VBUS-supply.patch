@@ -1,0 +1,90 @@
+From: Juan Sanchez <juanesf91@gmail.com>
+Subject: [PATCH] usb: dwc3: of-simple: enable the A733 DWC3 glue VBUS supply
+
+The Radxa Cubie A7A wires the USB2 side of the DWC3 (the FE1.1S hub
+and the AIC8800 behind it) to a VBUS load switch (U5, USB_HOST_EN/PM5).
+The board DT already declares it as reg_usb_host_en, and sun4i-usb-phy
+enables it for the EHCI ports, but the DWC3 glue never claims it:
+dwc3-of-simple.c only gets clocks/resets, and dwc3/core.c does not do
+a regulator_get() either. The result is that the xHCI USB2 port sees
+the hub D+ pull-up (CCS=1) but keeps PORTSC.PP=0/PED=0 and nothing
+enumerates, even with the U2P0 PHY fully initialised and the SERDES
+mux left at its boot value.
+
+Let the glue - which owns board-level VBUS - enable an optional "vbus"
+regulator before of_platform_populate() (i.e. before the child dwc3
+probes and issues its HCRST), but only for the A733 compatible and only
+in host mode, so no other dwc3-of-simple user changes behaviour. Boards
+without the property keep working (-ENODEV is ignored).
+
+Wire vbus-supply = <&reg_usb_host_en> in the Cubie A7A &usb3 node.
+
+Signed-off-by: Juan Sanchez <juanesf91@gmail.com>
+---
+ drivers/usb/dwc3/dwc3-of-simple.c                     | 22 +++++++++++++++++
+ .../dts/allwinner/sun60i-a733-cubie-a7a.dts          |  4 ++++
+ 2 files changed, 26 insertions(+)
+
+diff --git a/drivers/usb/dwc3/dwc3-of-simple.c b/drivers/usb/dwc3/dwc3-of-simple.c
+--- a/drivers/usb/dwc3/dwc3-of-simple.c
++++ b/drivers/usb/dwc3/dwc3-of-simple.c
+@@ -21,6 +21,7 @@
+ #include <linux/of_platform.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/reset.h>
++#include <linux/regulator/consumer.h>
+ 
+ struct dwc3_of_simple {
+ 	struct device		*dev;
+@@ -72,6 +73,26 @@
+ 	if (ret)
+ 		goto err_clk_put_all;
+ 
++	/*
++	 * The A733 DWC3 glue drives VBUS for the USB2 side (the on-board
++	 * FE1.1S hub) through a load switch. The core needs the regulator
++	 * enabled before the child dwc3 probes and issues its HCRST,
++	 * otherwise PORTSC.PP stays 0 and nothing enumerates. Request it
++	 * here - the glue owns the board-level VBUS, not the generic core.
++	 * Optional: boards without the property keep working (-ENODEV).
++	 */
++	/* The A733 glue is host-only; dr_mode lives on the child dwc3 node,
++	 * so do not gate this on usb_get_dr_mode(dev) (it would be UNKNOWN). */
++	if (of_device_is_compatible(np, "allwinner,sun60i-a733-dwc3")) {
++		ret = devm_regulator_get_enable_optional(dev, "vbus");
++		if (ret && ret != -ENODEV) {
++			dev_err(dev, "failed to enable VBUS: %d\n", ret);
++			goto err_clk_disable;
++		}
++		if (!ret)
++			dev_info(dev, "A733 DWC3: VBUS regulator enabled\n");
++	}
++
+ 	ret = of_platform_populate(np, NULL, NULL, dev);
+ 	if (ret)
+ 		goto err_clk_disable;
+diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts
+--- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts
++++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts
+@@ -618,6 +618,9 @@
+ };
+ 
+ &usb3 {
++	/* VBUS load switch for the USB2 side (FE1.1S hub / AIC8800 path).
++	 * dwc3-of-simple enables it before the child dwc3 probes. */
++	vbus-supply = <&reg_usb_host_en>;
+ 	/* No combo PHY in use, take the PIPE clock from the USB2 side */
+ 	assigned-clocks = <&serdes_ccu CLK_SERDES_USB3_PIPE>,
+ 			  <&ccu CLK_USB2_SUSPEND>,
+@@ -634,6 +637,11 @@
+ 	status = "okay";
+ };
+ 
++/* U2P0 is the USB2 side of the DWC3 (FE1.1S hub + AIC8800 path). */
++&u2phy {
++	status = "okay";
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pb9_pb10_pins>;

@@ -1,0 +1,296 @@
+From: Norman Herms <dockseed@proton.me>
+Subject: [PATCH] phy: allwinner: add the A733 USB2 PHY of the USB3 controller
+
+The USB3 DRD controller of the A733 has its own USB 2.0 UTMI PHY
+(U2P0 at 0x06b00000), separate from the sun4i-usb-phy that serves the
+EHCI/OHCI controllers. The DWC3 core soft reset runs on this PHY's
+UTMI clock, so it must be up before the core leaves reset.
+
+On init: take the PHY out of IDDQ, report VBUS valid, apply the vendor
+PHY tuning 0x143338d6 and select the trimmed 200 ohm reference via the
+system control regmap (companion patch extends its whitelist to 0x168).
+phy_exit() restores the calibration bits.
+
+The SERDES CCU already claims and deasserts RST_SERDES_USB3_USB2_PHY
+exclusively, so the PHY must not request that reset.
+
+Implement .set_mode(): the DWC3 calls phy_set_mode(PHY_MODE_USB_HOST)
+from dwc3/drd.c; without the callback the framework silently does
+nothing and the xHCI USB2 port stays at PORTSC.PP=0/PED=0, so the
+on-board FE1.1S hub never enumerates.
+
+.power_on() is a no-op on the SERDES bus-gating register: on this tree
+the combo PHY / SERDES CCU already drives the USB3 clocks and U-Boot
+leaves SUBSYS_USB3P1_BGR at 0x00330033 (bit21=1, UTMI from CCU).
+Clearing bit21 here makes the xHCI HCRST time out with -110. Keep the
+mux exactly as the CCU owns it.
+
+Tested-on: Radxa Cubie A7S (original driver)
+Assisted-by: LLM
+Signed-off-by: Norman Herms <dockseed@proton.me>
+Signed-off-by: Juan Sanchez <juanesf91@gmail.com>
+---
+ drivers/phy/allwinner/Kconfig                |  14 ++
+ drivers/phy/allwinner/Makefile               |   1 +
+ drivers/phy/allwinner/phy-sun60i-a733-usb2.c | 248 +++++++++++++++++++++++++++++
+ 3 files changed, 263 insertions(+)
+
+diff --git a/drivers/phy/allwinner/Kconfig b/drivers/phy/allwinner/Kconfig
+--- a/drivers/phy/allwinner/Kconfig
++++ b/drivers/phy/allwinner/Kconfig
+@@ -69,3 +69,14 @@
+ 	  subsystem. The PHY is a Cadence design behind an Allwinner wrapper
+ 	  and sits between the PCIe controller and the M.2 or mini PCIe slot
+ 	  of the board. Say Y here if you want to use PCIe on such a board.
++
++config PHY_SUN60I_A733_USB2
++	tristate "Allwinner A733 USB2 PHY of the USB3 controller"
++	depends on ARCH_SUNXI || COMPILE_TEST
++	depends on HAS_IOMEM && OF
++	depends on RESET_CONTROLLER
++	select GENERIC_PHY
++	select MFD_SYSCON
++	help
++	  USB 2.0 UTMI PHY of the A733 USB3 DRD controller (U2P0), reached
++	  through the system control regmap for the 200 ohm calibration.
+
+diff --git a/drivers/phy/allwinner/Makefile b/drivers/phy/allwinner/Makefile
+--- a/drivers/phy/allwinner/Makefile
++++ b/drivers/phy/allwinner/Makefile
+@@ -4,3 +4,4 @@
+ obj-$(CONFIG_PHY_SUN9I_USB)		+= phy-sun9i-usb.o
+ obj-$(CONFIG_PHY_SUN50I_USB3)		+= phy-sun50i-usb3.o
+ obj-$(CONFIG_PHY_SUN60I_A733_COMBOPHY)	+= phy-sun60i-a733-combophy.o
++obj-$(CONFIG_PHY_SUN60I_A733_USB2)	+= phy-sun60i-a733-usb2.o
+
+diff --git a/drivers/phy/allwinner/phy-sun60i-a733-usb2.c b/drivers/phy/allwinner/phy-sun60i-a733-usb2.c
+new file mode 100644
+index 0000000..9a79e85
+--- /dev/null
++++ b/drivers/phy/allwinner/phy-sun60i-a733-usb2.c
+@@ -0,0 +1,225 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Allwinner A733 USB 2.0 PHY of the USB3 DRD controller
++ *
++ * The UTMI clock of this PHY runs the soft reset of the DWC3 core, so the PHY
++ * has to be up before the core leaves reset. Its PLL needs the 200 ohm
++ * reference resistor calibrated by the unit in the system control block,
++ * which the PHY of the PCIe/USB SERDES uses as well. The user manual does not
++ * describe those registers; their layout follows the vendor USB PHY driver.
++ * Here they are reached through the regmap of the system control device
++ * (sunxi_sram), extended by a companion patch to allow RES1_CTRL 0x168.
++ * phy_exit() puts back the two control bits phy_init() changed.
++ */
++
++#include <linux/bitops.h>
++#include <linux/clk.h>
++#include <linux/io.h>
++#include <linux/mfd/syscon.h>
++#include <linux/module.h>
++#include <linux/phy/phy.h>
++#include <linux/platform_device.h>
++#include <linux/regmap.h>
++
++#define PHY_CTRL_REG			0x10
++#define  PHY_CTRL_OTG_DISABLE		BIT(10)
++#define  PHY_CTRL_VBUS_VALID_EXT	BIT(5)
++#define  PHY_CTRL_SIDDQ			BIT(3)
++#define PHY_TUNE_REG			0x18
++#define  PHY_TUNE_VALUE			0x143338d6
++
++/* Registers of the system control block */
++#define RESCAL_CTRL_REG			0x160
++#define  RESCAL_CTRL_CAL_EN		BIT(0)
++#define  RESCAL_CTRL_RES200_TRIM_SEL	BIT(10)
++#define  RESCAL_CTRL_MASK		(RESCAL_CTRL_CAL_EN | \
++					 RESCAL_CTRL_RES200_TRIM_SEL)
++#define RESCAL_RES1_CTRL_REG		0x168
++#define  RESCAL_RES1_RES200_TRIM	GENMASK(15, 8)
++
++struct sun60i_a733_usb2_phy {
++	void __iomem		*base;
++	struct regmap		*sysctrl;
++	struct clk		*clk;
++	/* control bits as found before phy_init(), put back on exit */
++	u32			rescal_ctrl;
++};
++
++/* Select the trimmed 200 ohm reference, remembering what was there */
++static int sun60i_a733_usb2_phy_rescal_on(struct sun60i_a733_usb2_phy *p)
++{
++	int ret;
++
++	ret = regmap_read(p->sysctrl, RESCAL_CTRL_REG, &p->rescal_ctrl);
++	if (ret)
++		return ret;
++
++	ret = regmap_update_bits(p->sysctrl, RESCAL_CTRL_REG, RESCAL_CTRL_MASK,
++				 RESCAL_CTRL_RES200_TRIM_SEL);
++	if (ret)
++		return ret;
++
++	ret = regmap_update_bits(p->sysctrl, RESCAL_RES1_CTRL_REG,
++				 RESCAL_RES1_RES200_TRIM, 0);
++	if (ret)
++		regmap_update_bits(p->sysctrl, RESCAL_CTRL_REG,
++				   RESCAL_CTRL_MASK, p->rescal_ctrl);
++
++	return ret;
++}
++
++static void sun60i_a733_usb2_phy_rescal_off(struct sun60i_a733_usb2_phy *p)
++{
++	regmap_update_bits(p->sysctrl, RESCAL_CTRL_REG, RESCAL_CTRL_MASK,
++			   p->rescal_ctrl);
++}
++
++static int sun60i_a733_usb2_phy_init(struct phy *phy)
++{
++	struct sun60i_a733_usb2_phy *p = phy_get_drvdata(phy);
++	int ret;
++
++	ret = clk_prepare_enable(p->clk);
++	if (ret)
++		return ret;
++
++	/*
++	 * v8 test: leave every PHY register exactly as the BootROM and
++	 * U-Boot left it. U-Boot detects the FE1.1S hub without running
++	 * any PHY driver, so any write here is suspect. Only keep the
++	 * clock enabled, which the DWC3 soft reset needs.
++	 */
++	dev_info(&phy->dev, "U2P0: init left PHY registers untouched\n");
++
++	return 0;
++
++err_clk:
++	clk_disable_unprepare(p->clk);
++	return ret;
++}
++
++static int sun60i_a733_usb2_phy_exit(struct phy *phy)
++{
++	/* v8 test: do not restore anything either */
++	clk_disable_unprepare(p->clk);
++
++	return 0;
++}
++
++static int sun60i_a733_usb2_phy_set_mode(struct phy *phy,
++					 enum phy_mode mode, int submode)
++{
++	struct sun60i_a733_usb2_phy *p = phy_get_drvdata(phy);
++	u32 val;
++
++	/*
++	 * The DWC3 calls phy_set_mode(PHY_MODE_USB_HOST) from dwc3/drd.c and
++	 * core.c. Without this callback the generic PHY framework silently
++	 * returns 0 and the USB2 side of the DWC3 never switches to host:
++	 * the xHCI port then keeps PORTSC.PP=0/PED=0 and the FE1.1S hub does
++	 * not enumerate even though D+ has a pull-up (CCS=1).
++	 *
++	 * Do the same board-level switch the sun4i-usb-phy did for the old
++	 * "third PHY" setup: force VBUS valid, disable the OTG block and
++	 * keep the PHY out of SIDDQ. The SERDES/CCU owns the clock mux, so
++	 * do not touch it here either.
++	 */
++	if (mode != PHY_MODE_USB_HOST && mode != PHY_MODE_USB_DEVICE)
++		return 0;
++
++	val = readl(p->base + PHY_CTRL_REG);
++	val |= PHY_CTRL_OTG_DISABLE | PHY_CTRL_VBUS_VALID_EXT;
++	val &= ~PHY_CTRL_SIDDQ;
++	writel(val, p->base + PHY_CTRL_REG);
++
++	dev_info(&phy->dev, "U2P0: phy_set_mode(%s)\n",
++		 mode == PHY_MODE_USB_HOST ? "HOST" : "DEVICE");
++	return 0;
++}
++
++static int sun60i_a733_usb2_phy_power_on(struct phy *phy)
++{
++	/*
++	 * Do NOT touch the SERDES UTMI clock mux here.
++	 *
++	 * On the 7.4 vendor port bit21 had to be cleared after the DWC3
++	 * soft reset, but this tree (Jernej a733-display-wip) already has
++	 * the combo PHY / SERDES CCU driving the USB3 clocks: U-Boot leaves
++	 * SUBSYS_USB3P1_BGR at 0x00330033 (bit21=1, UTMI from CCU), all the
++	 * dwc3 clocks are enabled, and the xHCI resets cleanly. Clearing
++	 * bit21 in .power_on() makes the HCRST time out with -110
++	 * ("xhci-hcd: can't setup") and the whole controller deregisters.
++	 * Keep the SERDES exactly as the CCU owns it.
++	 */
++	dev_info(&phy->dev, "U2P0: power_on (SERDES mux left to the CCU)\n");
++	return 0;
++}
++
++static int sun60i_a733_usb2_phy_power_off(struct phy *phy)
++{
++	return 0;
++}
++
++static const struct phy_ops sun60i_a733_usb2_phy_ops = {
++	.init		= sun60i_a733_usb2_phy_init,
++	.exit		= sun60i_a733_usb2_phy_exit,
++	.set_mode	= sun60i_a733_usb2_phy_set_mode,
++	.power_on	= sun60i_a733_usb2_phy_power_on,
++	.power_off	= sun60i_a733_usb2_phy_power_off,
++	.owner		= THIS_MODULE,
++};
++
++static int sun60i_a733_usb2_phy_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct sun60i_a733_usb2_phy *p;
++	struct phy_provider *provider;
++	struct phy *phy;
++
++	p = devm_kzalloc(dev, sizeof(*p), GFP_KERNEL);
++	if (!p)
++		return -ENOMEM;
++
++	p->base = devm_platform_ioremap_resource(pdev, 0);
++	if (IS_ERR(p->base))
++		return PTR_ERR(p->base);
++
++	/* -EPROBE_DEFER until the system control driver has registered it */
++	p->sysctrl = syscon_regmap_lookup_by_phandle(dev->of_node,
++						     "allwinner,sram");
++	if (IS_ERR(p->sysctrl))
++		return dev_err_probe(dev, PTR_ERR(p->sysctrl),
++				     "failed to get the system control regmap\n");
++
++	p->clk = devm_clk_get(dev, NULL);
++	if (IS_ERR(p->clk))
++		return dev_err_probe(dev, PTR_ERR(p->clk), "failed to get clock\n");
++
++	phy = devm_phy_create(dev, NULL, &sun60i_a733_usb2_phy_ops);
++	if (IS_ERR(phy))
++		return PTR_ERR(phy);
++
++	phy_set_drvdata(phy, p);
++
++	provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
++
++	return PTR_ERR_OR_ZERO(provider);
++}
++
++static const struct of_device_id sun60i_a733_usb2_phy_of_match[] = {
++	{ .compatible = "allwinner,sun60i-a733-usb2-phy" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, sun60i_a733_usb2_phy_of_match);
++
++static struct platform_driver sun60i_a733_usb2_phy_driver = {
++	.probe	= sun60i_a733_usb2_phy_probe,
++	.driver	= {
++		.name		= "sun60i-a733-usb2-phy",
++		.of_match_table	= sun60i_a733_usb2_phy_of_match,
++	},
++};
++module_platform_driver(sun60i_a733_usb2_phy_driver);
++
++MODULE_DESCRIPTION("Allwinner A733 USB2 PHY of the USB3 controller");
++MODULE_LICENSE("GPL");

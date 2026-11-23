@@ -1,0 +1,54 @@
+From: Juan Sanchez <juanesf91@gmail.com>
+Subject: [PATCH] soc: sunxi: sram: allow RES1_CTRL (0x168) in the A733 regmap
+
+The A733 system-control regmap is exposed by sunxi_sram and restricted
+by sunxi_sram_regmap_accessible_reg(). Its variant sets has_hdmi_rescal,
+which allows RESCAL_CTRL (0x160) and RES0_CTRL (0x164), but not
+RES1_CTRL (0x168) - and max_register stops at 0x164.
+
+The USB2 PHY of the DWC3 (U2P0) needs to clear the RES200 trim in
+RES1_CTRL during its 200 ohm calibration; going through the regmap
+currently returns -EIO and phy_init() aborts before touching the PHY,
+which makes the DWC3 probe fail with "failed to initialize core".
+A second ioremap of the same 0x03000000 range is not an option either,
+because sunxi_sram already owns that mem region (-EBUSY).
+
+Add RES1_CTRL to the whitelist (and raise max_register) for variants
+with has_hdmi_rescal. It is the third register of the same RESCAL
+block, so this does not widen access to any unrelated hardware.
+
+Signed-off-by: Juan Sanchez <juanesf91@gmail.com>
+---
+ drivers/soc/sunxi/sunxi_sram.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/soc/sunxi/sunxi_sram.c b/drivers/soc/sunxi/sunxi_sram.c
+--- a/drivers/soc/sunxi/sunxi_sram.c
++++ b/drivers/soc/sunxi/sunxi_sram.c
+@@ -368,6 +368,7 @@
+ #define SUNXI_SYS_LDO_CTRL_REG		0x150
+ #define SUNXI_SYS_RESCAL_CTRL_REG	0x160
+ #define SUNXI_SYS_RES0_CTRL_REG		0x164
++#define SUNXI_SYS_RES1_CTRL_REG		0x168
+ 
+ static bool sunxi_sram_regmap_accessible_reg(struct device *dev,
+ 					     unsigned int reg)
+@@ -382,7 +383,8 @@
+ 	if (reg == SUNXI_SYS_LDO_CTRL_REG && variant->has_ldo_ctrl)
+ 		return true;
+ 	if ((reg == SUNXI_SYS_RESCAL_CTRL_REG ||
+-	     reg == SUNXI_SYS_RES0_CTRL_REG) && variant->has_hdmi_rescal)
++	     reg == SUNXI_SYS_RES0_CTRL_REG ||
++	     reg == SUNXI_SYS_RES1_CTRL_REG) && variant->has_hdmi_rescal)
+ 		return true;
+ 
+ 	return false;
+@@ -407,7 +409,7 @@
+ 	.val_bits       = 32,
+ 	.reg_stride     = 4,
+ 	/* last defined register */
+-	.max_register   = SUNXI_SYS_RES0_CTRL_REG,
++	.max_register   = SUNXI_SYS_RES1_CTRL_REG,
+ 	/* other devices have no business accessing other registers */
+ 	.readable_reg	= sunxi_sram_regmap_accessible_reg,
+ 	.writeable_reg	= sunxi_sram_regmap_accessible_reg,

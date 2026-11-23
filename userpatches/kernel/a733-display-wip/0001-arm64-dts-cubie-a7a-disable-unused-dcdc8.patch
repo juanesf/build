@@ -1,0 +1,33 @@
+From: Juan Sanchez <juanesf91@gmail.com>
+Subject: [PATCH] arm64: dts: allwinner: cubie-a7a: disable unused dcdc8
+
+The Cubie A7A has no UFS. Keeping dcdc8 with a fixed 1.2 V constraint
+makes axp20x-regulator abort its whole probe (-EBUSY), leaving every
+vcc-*-supply of the pinctrl unresolved and trapping mmc/leds/uart/eth
+in an endless deferred probe. Disable the unused rail.
+
+Signed-off-by: Juan Sanchez <juanesf91@gmail.com>
+---
+ arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts
+--- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts
++++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts
+@@ -366,10 +366,13 @@
+ 				regulator-name = "vcc-dram";
+ 			};
+ 
++			/* The Cubie A7A has no UFS. Keeping dcdc8 with a fixed
++			 * 1.2 V constraint makes axp20x-regulator abort its whole
++			 * probe (-EBUSY), which leaves every vcc-*-supply of the
++			 * pinctrl unresolved and traps mmc/leds/uart/eth in an
++			 * endless deferred probe. Disable the unused rail. */
+ 			reg_dcdc8: dcdc8 {
+-				regulator-min-microvolt = <1200000>;
+-				regulator-max-microvolt = <1200000>;
+-				regulator-name = "vcc-ufs-io";
++				status = "disabled";
+ 			};
+ 
+ 			reg_dcdc9: dcdc9 {
