@@ -23,7 +23,7 @@ Signed-off-by: Juan Sanchez <juanesf91@gmail.com>
 ---
  drivers/usb/dwc3/dwc3-of-simple.c                     | 22 +++++++++++++++++
  .../dts/allwinner/sun60i-a733-cubie-a7a.dts          |  4 ++++
- 2 files changed, 26 insertions(+)
+ 2 files changed, 21 insertions(+)
 
 diff --git a/drivers/usb/dwc3/dwc3-of-simple.c b/drivers/usb/dwc3/dwc3-of-simple.c
 --- a/drivers/usb/dwc3/dwc3-of-simple.c
@@ -76,15 +76,5 @@ diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7a.dts b/arch/arm6
  	/* No combo PHY in use, take the PIPE clock from the USB2 side */
  	assigned-clocks = <&serdes_ccu CLK_SERDES_USB3_PIPE>,
  			  <&ccu CLK_USB2_SUSPEND>,
-@@ -634,6 +637,11 @@
- 	status = "okay";
- };
- 
-+/* U2P0 is the USB2 side of the DWC3 (FE1.1S hub + AIC8800 path). */
-+&u2phy {
-+	status = "okay";
-+};
-+
- &uart0 {
  	pinctrl-names = "default";
  	pinctrl-0 = <&uart0_pb9_pb10_pins>;
