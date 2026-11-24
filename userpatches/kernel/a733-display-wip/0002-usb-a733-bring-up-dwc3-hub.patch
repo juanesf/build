@@ -27,6 +27,7 @@ switch; without this the xHCI never re-asserts it and the hub enumerates
 with PP=0/PED=0.
 
 Signed-off-by: Juan Sanchez <juanesf91@gmail.com>
+Assisted-by: OpenCode (Big Pickle) <noreply@opencode.ai>
 ---
 diff --git a/drivers/phy/allwinner/phy-sun4i-usb.c b/drivers/phy/allwinner/phy-sun4i-usb.c
 index 2bb25c19ef12..15332edac734 100644

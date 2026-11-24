@@ -17,6 +17,7 @@ Wire the allwinner,sram phandle needed by the U2P0 PHY calibration and
 set the USB2 clock parents/rates to the BSP values.
 
 Signed-off-by: Juan Sanchez <juanesf91@gmail.com>
+Assisted-by: OpenCode (Big Pickle) <noreply@opencode.ai>
 ---
 diff --git a/Documentation/devicetree/bindings/usb/snps,dwc3.yaml b/Documentation/devicetree/bindings/usb/snps,dwc3.yaml
 index 4380bb6fa2f0..409a2e999d4b 100644
